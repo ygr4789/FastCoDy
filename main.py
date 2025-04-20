@@ -17,9 +17,12 @@ from sim.dphi import linear_tetmesh_dphi_dX
 from sim.arap_dq import linear_tetmesh_arap_dq
 from sim.arap_dq2 import linear_tetmesh_arap_dq2
 from sim.arap_q import linear_tetmesh_arap_q
+from sim.psd_fix import simple_psd_fix
 
 from vedo import Plotter, Mesh
 from vedo.applications import AnimationPlayer
+
+import time
 
 # ---- Assume custom functions are already defined elsewhere ----
 # from my_module import read_json_data, emu_to_lame, lumped_mass_matrix
@@ -53,7 +56,7 @@ def main():
 
     # === Mass Matrix ===
     M = lumped_mass_matrix(V, T)
-    M *= 200
+    M *= 1000
 
     # === Linear Blend Skinning A matrix ===
 
@@ -100,43 +103,24 @@ def main():
         # Compute reference state
         Vr = VM @ TF
         Ur = Vr - V
-        UrCol = vectorize(Ur)
+        UrCol = vectorize(Ur)        
         
-        # def objective_func(UcCol):
-        #     e = 0.5*(UrCol + UcCol - UCol0 - dt*UdCol0).T @ \
-        #             (M/(dt*dt)) @ (UrCol + UcCol - UCol0 - dt*UdCol0)
-        #     return e + linear_tetmesh_arap_q(V, T, VCol + UrCol + UcCol, dX, vol, params)
-        # def jac_func(UcCol):
-        #     q = VCol + UrCol + UcCol
-        #     jac = (M/(dt*dt)) @ (UrCol + UcCol - UCol0 - dt*UdCol0)
-        #     return jac + linear_tetmesh_arap_dq(V, T, q, dX, vol, params)
-        
-        # comp_constraint = LinearConstraint(Aeq, 0.0, 0.0)
-
-        # res = minimize(
-        #     objective_func,
-        #     UcCol,
-        #     jac=jac_func,
-        #     constraints=[comp_constraint]
-        # )
-        # UcCol = res.x
-        # UCol = UrCol + UcCol
-        # UdCol = (UCol - UCol0) / dt
-        
-        # # Store result
-        # Vn = V + matrixize(UCol)
-        # Vn_list.append(Vn)
-        
-        # continue
-        
+        start = time.time()
         # Newton iterations
         for i in range(max_iter):
             # Current state
+            print(f"  iter {i}")
             q = VCol + UrCol + UcCol
             
             # Compute gradient and hessian
             G = linear_tetmesh_arap_dq(V, T, q, dX, vol, params)
+            flag = time.time()
+            print(f"    G-compute : {flag - start:.5f} sec")
+            start = flag
             K = linear_tetmesh_arap_dq2(V, T, q, dX, vol, params)
+            flag = time.time()
+            print(f"    K-compute : {flag - start:.5f} sec")
+            start = flag
             
             # Build system matrix and RHS
             tmp_g = (M/(dt*dt)) @ (UrCol + UcCol) - \
@@ -159,6 +143,10 @@ def main():
             if tmp_g @ dUc > -1e-6:
                 break
             
+            flag = time.time()
+            print(f"    M-compute : {flag - start:.5f} sec")
+            start = flag
+            
             # Line search
             def f(UrColi, UcColi):
                 e = 0.5*(UrColi + UcColi - UCol0 - dt*UdCol0).T @ \
@@ -169,6 +157,10 @@ def main():
             # Update position
             alpha = line_search(f, tmp_g, dUc, UrCol, UcCol)
             UcCol = UcCol + alpha * dUc
+            
+            flag = time.time()
+            print(f"    L-compute : {flag - start:.5f} sec")
+            start = flag
         
         # Update velocities and positions for next frame
         UCol = UrCol + UcCol

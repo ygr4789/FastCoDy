@@ -21,7 +21,7 @@ def eval_at_point(V, T, func, tmp_shape, X=None):
     for i in range(M):
         element = T[i]
         dphi = func(V, element)
-        results[i, :] = dphi.flatten()
+        results[i, :] = dphi.T.flatten()
 
     return results
 

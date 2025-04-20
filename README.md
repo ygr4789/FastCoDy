@@ -1,0 +1,1 @@
+export CPATH=$CONDA_PREFIX/include:$CPATH
