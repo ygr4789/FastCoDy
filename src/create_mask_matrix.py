@@ -2,9 +2,13 @@ import numpy as np
 import scipy.sparse as sp
 import igl
 
-from src.lumped_mass_matrix import compute_vertex_voronoi_volumes
+if __name__ == "__main__":
+    from lumped_mass_matrix import compute_vertex_voronoi_volumes
+    from read_data_from_json import read_json_data
+else:
+    from .lumped_mass_matrix import compute_vertex_voronoi_volumes
 
-def create_poisson_mask_matrix(V, T):
+def create_mask_matrix(V, T, flag="poisson"):
     """
     Create a Poisson mask matrix phi (3N x 3N) as a diagonal sparse matrix.
 
@@ -25,29 +29,52 @@ def create_poisson_mask_matrix(V, T):
     b = np.unique(F.flatten())
 
     # Solve Poisson system with boundary constraints
-    # ones = np.ones(V.shape[0])
     bc = np.zeros(len(b))
     Q = -L
 
-    Aeq = sp.csr_matrix((0, Q.shape[0]))
+    Aeq = sp.csc_matrix((0, Q.shape[0]))
     Beq = np.array([])  
 
-    # print(Q.shape, l.shape, b.shape, bc.shape, Aeq.shape, Beq.shape)
-    # Z = igl.min_quad_with_fixed(Q, M, b, bc, Aeq, Beq, False)
+    _, Z = igl.min_quad_with_fixed(Q, M, b, bc, Aeq, Beq, False)
 
     # Multiply solution by mass matrix
-    # Z_mass = M @ Z
-    Z_mass = np.identity(V.shape[0])
+    Z_mass = M * Z
 
     # Build diagonal mask (here: it's a zero diagonal matrix)
     ZZ = np.zeros(3 * Z_mass.shape[0])
     
     # Optional: use Z to weight mask if needed
     for i in range(Z_mass.shape[0]):
-        if i in b: continue
-        ZZ[3 * i + 0] = 1.0
-        ZZ[3 * i + 1] = 1.0
-        ZZ[3 * i + 2] = 1.0
+        if V[i][2] > 0.06:
+            ZZ[3 * i + 0] = 0.0
+            ZZ[3 * i + 1] = 0.0
+            ZZ[3 * i + 2] = 0.0
+        else:
+            ZZ[3 * i + 0] = 1.0
+            ZZ[3 * i + 1] = 1.0
+            ZZ[3 * i + 2] = 1.0
+        # ZZ[3 * i + 0] = Z[i]
+        # ZZ[3 * i + 1] = Z[i]
+        # ZZ[3 * i + 2] = Z[i]
 
     phi = sp.diags(ZZ, offsets=0, shape=(3 * V.shape[0], 3 * V.shape[0]), format='csr')
     return phi
+
+
+if __name__ == "__main__":
+    import sys
+    json_path = sys.argv[1] if len(sys.argv) > 1 else "examples/elephant/elephant.json"
+
+    V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
+    phi = create_mask_matrix(V, T)
+    phi_diag = phi.diagonal() 
+    Z = phi_diag[::3]
+    
+    from vedo import Mesh, Plotter, Points
+    
+    pc = Points(V, r=8)
+    pc.pointdata["scalars"] = Z
+    pc.cmap("viridis").add_scalarbar(title="weight")
+
+    plotter = Plotter()
+    plotter.show(pc, interactive = True)

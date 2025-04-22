@@ -24,16 +24,16 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${bartels_ROOT}/cmake)
 include(${bartels_ROOT}/cmake/bartels.cmake)
 
 # Add Python module
-pybind11_add_module(mycpp arap.cpp)
+pybind11_add_module(pyBartels arap.cpp)
 
 # Set include directories for the Python module
-target_include_directories(mycpp 
+target_include_directories(pyBartels 
     PRIVATE 
         ${EIGEN3_INCLUDE_DIR}
 )
 
 # Link against Bartels and Eigen
-target_link_libraries(mycpp 
+target_link_libraries(pyBartels 
     PRIVATE 
         bartels
         Eigen3::Eigen

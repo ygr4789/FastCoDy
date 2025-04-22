@@ -1,3 +1,6 @@
 [submodule "Bartels"]
 	path = Bartels
 	url = https://github.com/dilevin/Bartels.git
+[submodule "fTetWild"]
+	path = fTetWild
+	url = https://github.com/wildmeshing/fTetWild.git

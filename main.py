@@ -4,39 +4,21 @@ import igl
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from scipy.optimize import minimize, LinearConstraint
+from src import *
+from sim import *
 
-from src.util import *
-from src.lbs_matrix import *
-from src.read_data_from_json import *
-from src.lumped_mass_matrix import *
-from src.create_mask_matrix import *
-from src.line_search import *
-
-from sim.dphi import linear_tetmesh_dphi_dX
-from sim.arap_dq import linear_tetmesh_arap_dq
-from sim.arap_dq2 import linear_tetmesh_arap_dq2
-from sim.arap_q import linear_tetmesh_arap_q
-from sim.psd_fix import simple_psd_fix
-
-from vedo import Plotter, Mesh
+from vedo import Mesh
 from vedo.applications import AnimationPlayer
 
 import time
 
-# ---- Assume custom functions are already defined elsewhere ----
-# from my_module import read_json_data, emu_to_lame, lumped_mass_matrix
-# from my_module import lbs_matrix_column, create_poisson_mask_matrix
-# from my_module import vectorize, linear_tetmesh_dphi_dX
+# import sys
+# sys.path.append("./pybind/build")
+# import pyBartels
 
-# === Initialization ==
-
-def main():
-    json_path = sys.argv[1] if len(sys.argv) > 1 else "examples/sphere/sphere.json"
-
+def create_animation(json_path):
     # Load mesh and animation data
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
-    
     lambda_, mu = emu_to_lame(YM, pr)
 
     params = np.zeros((T.shape[0], 2))
@@ -46,37 +28,29 @@ def main():
     # === Boundary faces and LBS Matrix ===
     F = igl.boundary_facets(T)
     F = F[:, ::-1]  # reverse each face row to match
-
     VM = igl.lbs_matrix(V, W)
 
     # === Volume and differential operator ===
-
     vol = igl.volume(V, T)
+    # dX = pyBartels.linear_tetmesh_dphi_dX(V, T)
     dX = linear_tetmesh_dphi_dX(V, T)
 
     # === Mass Matrix ===
     M = lumped_mass_matrix(V, T)
     M *= 1000
+    # M *= 10000
 
     # === Linear Blend Skinning A matrix ===
-
     A = lbs_matrix_column(V, W)
 
     # === Poisson Constraint Mask ===
-
-    phi = create_poisson_mask_matrix(V, T)
+    phi = create_mask_matrix(V, T)
 
     # === Constraint system ===
-
     Aeq = A.T @ M @ phi
-    # Aeq = np.zeros((24, Aeq.shape[1]))
-    # Aeq[:, :24] = np.eye(24)
-    
-    
     Beq = np.zeros(Aeq.shape[0])
 
     # === Initial Transformation ===
-
     TF = TF_list[0]
     Vr = VM @ TF
     U = Vr - V
@@ -109,18 +83,21 @@ def main():
         # Newton iterations
         for i in range(max_iter):
             # Current state
-            print(f"  iter {i}")
+            # print(f"  iter {i}")
             q = VCol + UrCol + UcCol
             
             # Compute gradient and hessian
+            # G = pyBartels.linear_tetmesh_arap_dq(V, T, q, dX, vol, params)
             G = linear_tetmesh_arap_dq(V, T, q, dX, vol, params)
-            flag = time.time()
-            print(f"    G-compute : {flag - start:.5f} sec")
-            start = flag
+            # flag = time.time()
+            # print(f"    G-compute : {flag - start:.5f} sec")
+            # start = flag
+            
+            # K = pyBartels.linear_tetmesh_arap_dq2(V, T, q, dX, vol, params)
             K = linear_tetmesh_arap_dq2(V, T, q, dX, vol, params)
-            flag = time.time()
-            print(f"    K-compute : {flag - start:.5f} sec")
-            start = flag
+            # flag = time.time()
+            # print(f"    K-compute : {flag - start:.5f} sec")
+            # start = flag
             
             # Build system matrix and RHS
             tmp_g = (M/(dt*dt)) @ (UrCol + UcCol) - \
@@ -143,14 +120,15 @@ def main():
             if tmp_g @ dUc > -1e-6:
                 break
             
-            flag = time.time()
-            print(f"    M-compute : {flag - start:.5f} sec")
-            start = flag
+            # flag = time.time()
+            # print(f"    M-compute : {flag - start:.5f} sec")
+            # start = flag
             
             # Line search
             def f(UrColi, UcColi):
                 e = 0.5*(UrColi + UcColi - UCol0 - dt*UdCol0).T @ \
                     (M/(dt*dt)) @ (UrColi + UcColi - UCol0 - dt*UdCol0)
+                # return e + pyBartels.linear_tetmesh_arap_q(V, T, VCol + UrColi + UcColi, 
                 return e + linear_tetmesh_arap_q(V, T, VCol + UrColi + UcColi, 
                                                dX, vol, params)
             
@@ -158,9 +136,9 @@ def main():
             alpha = line_search(f, tmp_g, dUc, UrCol, UcCol)
             UcCol = UcCol + alpha * dUc
             
-            flag = time.time()
-            print(f"    L-compute : {flag - start:.5f} sec")
-            start = flag
+            # flag = time.time()
+            # print(f"    L-compute : {flag - start:.5f} sec")
+            # start = flag
         
         # Update velocities and positions for next frame
         UCol = UrCol + UcCol
@@ -171,6 +149,9 @@ def main():
         Vn_list.append(Vn)
 
     # np.save('elephant',Vn_list)
+    return Vn_list, F
+
+def render_animation(Vn_list, F):
     mesh = Mesh([Vn_list[0], F])
 
     def update_scene(i: int):
@@ -185,5 +166,29 @@ def main():
     plt.close()
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description='generate complementary dynamics secondary motion')
+    parser.add_argument('--input', '-i', type=str, required=False, help='json input path')
+    parser.add_argument('--output', '-o', type=str, required=False, help='output path')
+    parser.add_argument('--data', '-d', type=str, required=False, help='prebuilt data')
+    
+    args = parser.parse_args()
+    input = args.input
+    output = args.output
+    data = args.data
+    
+    if input is None and data is None:
+        print("input json file or prebuilt data required")
+        exit()
+    
+    if data:
+        Vn_list = np.load(data)
+    elif input:
+        Vn_list, F = create_animation(input)
+        if output:
+            np.save(output, Vn_list)
+            
+    render_animation(Vn_list, F)
+        
+    
 

@@ -77,12 +77,12 @@ double linear_tetmesh_arap_q_wrapper(
     py::array_t<double, py::array::c_style | py::array::forcecast> volume,
     py::array_t<double, py::array::c_style | py::array::forcecast> params
 ) {
-    Eigen::MatrixXd V_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (V.data(), V.shape(0), V.shape(1));
-    Eigen::MatrixXi E_mat = Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (E.data(), E.shape(0), E.shape(1));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> V_mat(V.data(), V.shape(0), V.shape(1));
+    Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> E_mat(E.data(), E.shape(0), E.shape(1));
     Eigen::Map<const Eigen::VectorXd> q_vec(q.data(), q.size());
-    Eigen::MatrixXd dphidX_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (dphidX.data(), dphidX.shape(0), dphidX.shape(1));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> dphidX_mat(dphidX.data(), dphidX.shape(0), dphidX.shape(1));
     Eigen::Map<const Eigen::VectorXd> volume_vec(volume.data(), volume.shape(0));
-    Eigen::MatrixXd params_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (params.data(), params.shape(0), params.shape(1));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> params_mat(params.data(), params.shape(0), params.shape(1));
     
     // Call the function
     return sim::linear_tetmesh_arap_q(V_mat, E_mat, q_vec, dphidX_mat, volume_vec, params_mat);
@@ -96,12 +96,12 @@ py::array_t<double> linear_tetmesh_arap_dq_wrapper(
     py::array_t<double, py::array::c_style | py::array::forcecast> volume,
     py::array_t<double, py::array::c_style | py::array::forcecast> params
 ) {
-    Eigen::MatrixXd V_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(V.data(), V.shape(0), V.shape(1));
-    Eigen::MatrixXi E_mat = Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (E.data(), E.shape(0), E.shape(1));
-    Eigen::VectorXd q_vec = Eigen::Map<const Eigen::VectorXd>(q.data(), q.size());
-    Eigen::MatrixXd dphidX_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (dphidX.data(), dphidX.shape(0), dphidX.shape(1));
-    Eigen::VectorXd volume_vec = Eigen::Map<const Eigen::VectorXd>(volume.data(), volume.shape(0));
-    Eigen::MatrixXd params_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (params.data(), params.shape(0), params.shape(1));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> V_mat(V.data(), V.shape(0), V.shape(1));
+    Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>  E_mat(E.data(), E.shape(0), E.shape(1));
+    Eigen::Map<const Eigen::VectorXd> q_vec(q.data(), q.size());
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> dphidX_mat(dphidX.data(), dphidX.shape(0), dphidX.shape(1));
+    Eigen::Map<const Eigen::VectorXd> volume_vec(volume.data(), volume.shape(0));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> params_mat(params.data(), params.shape(0), params.shape(1));
     Eigen::VectorXd result;
     
     // Call the function
@@ -123,16 +123,16 @@ py::object linear_tetmesh_arap_dq2_wrapper(
     py::array_t<double, py::array::c_style | py::array::forcecast> volume,
     py::array_t<double, py::array::c_style | py::array::forcecast> params
 ) {
-    Eigen::MatrixXd V_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(V.data(), V.shape(0), V.shape(1));
-    Eigen::MatrixXi E_mat = Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (E.data(), E.shape(0), E.shape(1));
-    Eigen::VectorXd q_vec = Eigen::Map<const Eigen::VectorXd>(q.data(), q.size());
-    Eigen::MatrixXd dphidX_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (dphidX.data(), dphidX.shape(0), dphidX.shape(1));
-    Eigen::VectorXd volume_vec = Eigen::Map<const Eigen::VectorXd>(volume.data(), volume.shape(0));
-    Eigen::MatrixXd params_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> (params.data(), params.shape(0), params.shape(1));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> V_mat(V.data(), V.shape(0), V.shape(1));
+    Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> E_mat(E.data(), E.shape(0), E.shape(1));
+    Eigen::Map<const Eigen::VectorXd> q_vec(q.data(), q.size());
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> dphidX_mat(dphidX.data(), dphidX.shape(0), dphidX.shape(1));
+    Eigen::Map<const Eigen::VectorXd> volume_vec(volume.data(), volume.shape(0));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> params_mat(params.data(), params.shape(0), params.shape(1));
     SpMat result;
     
     // Call the function
-    sim::linear_tetmesh_arap_dq2(result, V_mat, E_mat, q_vec, dphidX_mat, volume_vec, params_mat);
+    sim::linear_tetmesh_arap_dq2(result, V_mat, E_mat, q_vec, dphidX_mat, volume_vec, params_mat, [](auto &a) {sim::simple_psd_fix(a, 1e-3);});
     return eigen_to_csr(result);
 }
 
@@ -140,8 +140,8 @@ py::array_t<double> linear_tetmesh_dphi_dX_wrapper(
     py::array_t<double, py::array::c_style | py::array::forcecast> V,
     py::array_t<int, py::array::c_style | py::array::forcecast> E
 ) {
-    Eigen::MatrixXd V_mat = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(V.data(), V.shape(0), V.shape(1));
-    Eigen::MatrixXi E_mat = Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(E.data(), E.shape(0), E.shape(1));
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> V_mat(V.data(), V.shape(0), V.shape(1));
+    Eigen::Map<const Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> E_mat(E.data(), E.shape(0), E.shape(1));
     Eigen::MatrixXd result;
 
     // Call the function
@@ -155,7 +155,7 @@ py::array_t<double> linear_tetmesh_dphi_dX_wrapper(
     );
 }
 
-PYBIND11_MODULE(mycpp, m) {
+PYBIND11_MODULE(pyBartels, m) {
     m.def("linear_tetmesh_dphi_dX", &linear_tetmesh_dphi_dX_wrapper,
           "Compute dphi/dX for tetrahedral mesh");
 
