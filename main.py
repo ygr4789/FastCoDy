@@ -16,7 +16,7 @@ import time
 # sys.path.append("./pybind/build")
 # import pyBartels
 
-def create_animation(json_path):
+def create_cody_animation(json_path):
     # Load mesh and animation data
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
     lambda_, mu = emu_to_lame(YM, pr)
@@ -38,7 +38,6 @@ def create_animation(json_path):
     # === Mass Matrix ===
     M = lumped_mass_matrix(V, T)
     M *= 1000
-    # M *= 10000
 
     # === Linear Blend Skinning A matrix ===
     A = lbs_matrix_column(V, W)
@@ -168,27 +167,22 @@ def render_animation(Vn_list, F):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='generate complementary dynamics secondary motion')
-    parser.add_argument('--input', '-i', type=str, required=False, help='json input path')
+    parser.add_argument('--input', '-i', type=str, required=False, default='examples/sphere/sphere.json', help='json input path')
     parser.add_argument('--output', '-o', type=str, required=False, help='output path')
     parser.add_argument('--data', '-d', type=str, required=False, help='prebuilt data')
     
     args = parser.parse_args()
-    input = args.input
-    output = args.output
+    input_path = args.input
+    output_path = args.output
     data = args.data
     
-    if input is None and data is None:
-        print("input json file or prebuilt data required")
-        exit()
-    
     if data:
-        Vn_list = np.load(data)
-    elif input:
-        Vn_list, F = create_animation(input)
-        if output:
-            np.save(output, Vn_list)
+        data = np.load(data)
+        Vn_list = data["anim"]
+        F = data["faces"]
+    elif input_path:
+        Vn_list, F = create_cody_animation(input_path)
+        if output_path:
+            np.savez(output_path, anim=Vn_list, faces=F)
             
     render_animation(Vn_list, F)
-        
-    
-

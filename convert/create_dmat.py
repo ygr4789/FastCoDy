@@ -33,6 +33,7 @@ def refine_tetmesh(V, T, C, BE, tol=1e-8):
     for i, p in enumerate(bone_midpoints):
         dists = np.linalg.norm(np.array(V) - p, axis=1)
         if np.min(dists) < tol:
+            print("Control point already exists:", p)
             continue  # already exists
 
         # Find tetrahedron that contains p
@@ -77,7 +78,10 @@ def create_weights(V, T, C, BE):
     W = bbw_solver.solve(V, T, b, bc)
     return W[:original_v_num]
 
-def visualize_weights(V, F, W, C, BE, flag="surface"):
+def visualize_weights(mesh_path, tgf_path, flag="surface"):
+    V, T, F, C, BE = read_properties(mesh_path, tgf_path)
+    W = create_weights(V, T, C, BE)
+    
     num_bones = BE.shape[0]
     rows = int(np.sqrt(num_bones))
     cols = int(np.ceil(num_bones / rows))
@@ -127,13 +131,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='create BBW weights from mesh and tgf')
     parser.add_argument('--mesh', '-m', type=str, required=True, help='mesh file path')
     parser.add_argument('--tgf', '-t', type=str, required=True, help='tgf file path')
-    parser.add_argument('--flag', '-f', type=str, required=False, default='surface', help='plot surface/pointcloud')
+    parser.add_argument('--out', '-o', type=str, required=False, default='out.dmat', help='output dmat file path')
+    parser.add_argument('--render', '-r', action="store_true", required=False, default=False, help='plot surface/pointcloud')
     
     args = parser.parse_args()
     mesh_path = args.mesh
     tgf_path = args.tgf
-    flag = args.flag
+    output_path = args.out
     
-    V, T, F, C, BE = read_properties(mesh_path, tgf_path)
-    W = create_weights(V, T, C, BE)
-    visualize_weights(V, F, W, C, BE, flag)
+    if args.render:
+        visualize_weights(mesh_path, tgf_path)
+    else:
+        create_dmat(mesh_path, tgf_path, output_path)

@@ -4,8 +4,6 @@ from collections import defaultdict
 
 def extract_surface_faces(tetrahedrons):
     face_count = defaultdict(int)
-    
-    # Each tetrahedron has 4 faces
     face_combinations = [
         [0, 1, 2],
         [0, 1, 3],
@@ -26,24 +24,19 @@ def convert_msh_to_mesh(msh_path, mesh_path):
     # Read tetrahedral mesh using meshio
     mesh = meshio.read(msh_path) # Read Gmsh .msh file
     points = mesh.points # (n_points, 3)
-    print(points.shape)
     cells = mesh.cells_dict
     tets = cells.get("tetra", [])
-    print(tets.shape)
-
     surface_faces = extract_surface_faces(tets)
     
     # enforce MeshVersionFormatted to be 1
     points = points.astype(np.float32)
-    tets = tets.astype(np.int32)  # usually int32 is fine
+    tets = tets.astype(np.int32)
     surface_faces = surface_faces.astype(np.int32)
-
-    print(surface_faces.shape)
 
     mesh = meshio.Mesh(
         points=points,
         cells=[
-            ("triangle", surface_faces),  # Optional surface mesh
+            ("triangle", surface_faces),
             ("tetra", tets)
         ]
     )

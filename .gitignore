@@ -1,6 +1,6 @@
-*.npy
 .vscode
 __pycache__
 build
-data
-*.blend*
+test
+result
+blender
