@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import svd
 import scipy.sparse as sp
-from numba import njit
+from numba import njit, prange
 
 from .kron import kron_dphidX_eye3
 
@@ -48,20 +48,28 @@ def linear_tet_arap_dq(q, element, dphidX, params, volume):
     out = B.T @ dF * volume
     return out
 
-@njit
-def linear_tetmesh_arap_dq(V, E, q, dphidX, volume, params):
+@njit(parallel=True)
+def linear_tetall_arap_dq(V, E, q, dphidX, volume, params):
     num_tets = E.shape[0]
-    N = V.shape[0]
-    out = np.zeros(3 * N)
+    H_all = np.zeros((num_tets, 12), dtype=np.float64)
 
-    for t in range(num_tets):
+    for t in prange(num_tets):
         element = E[t]
         dphi_matrix = dphidX[t].reshape(3, 4)
         param_t = params[t]
-        H = linear_tet_arap_dq(q, element, dphi_matrix, param_t, volume[t])
+        H_all[t] = linear_tet_arap_dq(q, element, dphi_matrix, param_t, volume[t])
+        
+    return H_all
 
-        for i in range(4):
-            idx = element[i]
-            out[3 * idx: 3 * idx + 3] += H[3 * i: 3 * i + 3]
+def linear_tetmesh_arap_dq(V, E, q, dphidX, volume, params):
+    H_all = linear_tetall_arap_dq(V, E, q, dphidX, volume, params)
+    
+    N = V.shape[0]
+    out = np.zeros(3 * N, dtype=H_all.dtype)
+
+    indices = (3 * E[..., None]) + np.array([0, 1, 2])  # shape (num_tets, 4, 3)
+    indices = indices.reshape(-1)                       # (num_tets * 12,)
+    values = H_all.reshape(-1)  
+    np.add.at(out, indices, values)
 
     return out

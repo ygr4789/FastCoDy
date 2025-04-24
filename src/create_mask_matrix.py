@@ -8,7 +8,7 @@ if __name__ == "__main__":
 else:
     from .lumped_mass_matrix import compute_vertex_voronoi_volumes
 
-def create_mask_matrix(V, T, flag="poisson"):
+def create_mask_matrix(V, T, C=None, BE=None, flag="poisson"):
     """
     Create a Poisson mask matrix phi (3N x 3N) as a diagonal sparse matrix.
 
@@ -45,25 +45,33 @@ def create_mask_matrix(V, T, flag="poisson"):
     
     # Optional: use Z to weight mask if needed
     for i in range(Z_mass.shape[0]):
-        if V[i][2] > 0.06:
-            ZZ[3 * i + 0] = 0.0
-            ZZ[3 * i + 1] = 0.0
-            ZZ[3 * i + 2] = 0.0
-        else:
-            ZZ[3 * i + 0] = 1.0
-            ZZ[3 * i + 1] = 1.0
-            ZZ[3 * i + 2] = 1.0
-        # ZZ[3 * i + 0] = Z[i]
-        # ZZ[3 * i + 1] = Z[i]
-        # ZZ[3 * i + 2] = Z[i]
+        # if V[i][2] > 0.5:
+        #     ZZ[3 * i + 0] = 0.0
+        #     ZZ[3 * i + 1] = 0.0
+        #     ZZ[3 * i + 2] = 0.0
+        # elif V[i][2] < -0.5:
+        #     ZZ[3 * i + 0] = 1.0
+        #     ZZ[3 * i + 1] = 1.0
+        #     ZZ[3 * i + 2] = 1.0
+        # else:
+        #     w = (0.5 - V[i][2]) / 1
+        #     ZZ[3 * i + 0] = w
+        #     ZZ[3 * i + 1] = w
+        #     ZZ[3 * i + 2] = w
+        ZZ[3 * i + 0] = Z[i]
+        ZZ[3 * i + 1] = Z[i]
+        ZZ[3 * i + 2] = Z[i]
 
     phi = sp.diags(ZZ, offsets=0, shape=(3 * V.shape[0], 3 * V.shape[0]), format='csr')
     return phi
 
 
 if __name__ == "__main__":
-    import sys
-    json_path = sys.argv[1] if len(sys.argv) > 1 else "examples/elephant/elephant.json"
+    import argparse
+    parser = argparse.ArgumentParser(description='calculate cody constrint mask weights')
+    parser.add_argument('--input', '-i', type=str, required=False, default='examples/sphere/sphere.json', help='json input path')
+    args = parser.parse_args()
+    json_path = args.input
 
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
     phi = create_mask_matrix(V, T)

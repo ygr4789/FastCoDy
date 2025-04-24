@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from numba import njit
+from numba import njit, prange
 
 from .dsvd import dsvd
 from .psd_fix import simple_psd_fix
@@ -95,56 +95,34 @@ def linear_tet_arap_dq2(q, element, dphidX, params, volume):
     H = B.T @ dF @ B * volume
     return H
 
-@njit
-def linear_tetmesh_arap_dq2_sp(V, E, q, dphidX, volume, params):
-    """
-    Assemble a global sparse matrix from per-tetrahedron ARAP derivatives.
-
-    Args:
-        V: (N, 3) vertex positions
-        E: (M, 4) tetrahedron indices
-        q: (3N,) global displacement vector
-        dphidX: (M, 12)
-        volume: (M,)
-        params: (M, K) or (M,)
-        func: optional callback for H (e.g., to collect triplets or modify H)
-    Returns:
-        out: scipy.sparse.csr_matrix of shape (3N, 3N)
-    """
+@njit(parallel=True)
+def linear_tetall_arap_dq2(V, E, q, dphidX, volume, params):
     num_tets = E.shape[0]
+    H_all = np.zeros((num_tets, 12, 12), dtype=np.float64)
 
-    row_indices = []
-    col_indices = []
-    values = []
-
-    for t in range(num_tets):
+    for t in prange(num_tets):
         element = E[t]
         dphi = dphidX[t].reshape(3, 4)
         param = params[t]
         vol = volume[t]
 
         H_local = linear_tet_arap_dq2(q, element, dphi, param, vol)  # (12, 12)
-        H_local = simple_psd_fix(H_local)
+        H_all[t] = simple_psd_fix(H_local)
 
-        for i in range(4):
-            for j in range(4):
-                vi = element[i]
-                vj = element[j]
-                for ri in range(3):
-                    for rj in range(3):
-                        global_row = 3 * vi + ri
-                        global_col = 3 * vj + rj
-                        local_val = H_local[3 * i + ri, 3 * j + rj]
-
-                        row_indices.append(global_row)
-                        col_indices.append(global_col)
-                        values.append(local_val)
-
-    return values, row_indices, col_indices
+    return H_all
 
 def linear_tetmesh_arap_dq2(V, E, q, dphidX, volume, params):
+    H_all = linear_tetall_arap_dq2(V, E, q, dphidX, volume, params)
+    num_tets = E.shape[0]
     N = V.shape[0]
-    values, row_indices, col_indices = linear_tetmesh_arap_dq2_sp(V, E, q, dphidX, volume, params)
+
+    offsets = np.array([0, 1, 2])
+    global_idx = 3 * E[:, :, None] + offsets  # shape (num_tets, 4, 3)
+    global_idx = global_idx.reshape(num_tets, 12)
+
+    row_indices = np.repeat(global_idx, 12, axis=1).reshape(-1)  # (num_tets * 144,)
+    col_indices = np.tile(global_idx, (1, 12)).reshape(-1)       # (num_tets * 144,)
+
+    values = H_all.reshape(-1)
     H_sparse = sp.coo_matrix((values, (row_indices, col_indices)), shape=(3 * N, 3 * N)).tocsr()
     return H_sparse
-

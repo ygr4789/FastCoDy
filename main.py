@@ -23,6 +23,7 @@ def create_cody_animation(json_path):
 
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = 0.5 * lambda_
+    # params[:, 0] = lambda_
     params[:, 1] = mu
 
     # === Boundary faces and LBS Matrix ===
@@ -38,6 +39,7 @@ def create_cody_animation(json_path):
     # === Mass Matrix ===
     M = lumped_mass_matrix(V, T)
     M *= 1000
+    # M *= 10000
 
     # === Linear Blend Skinning A matrix ===
     A = lbs_matrix_column(V, W)
@@ -65,6 +67,18 @@ def create_cody_animation(json_path):
     max_iter = 20
     Vn_list = []
 
+    # ---------------------------------------------------
+    Vr = VM @ TF
+    Ur = Vr - V
+    UrCol = vectorize(Ur)
+    q = VCol + UrCol + UcCol
+    print(f"compiling njax...")
+    G = linear_tetmesh_arap_dq(V, T, q, dX, vol, params)
+    K = linear_tetmesh_arap_dq2(V, T, q, dX, vol, params)
+    e = linear_tetmesh_arap_q(V, T, q, dX, vol, params)
+    # ---------------------------------------------------
+        
+    start = time.time()
     for ai, TF in enumerate(TF_list):
         print(f"frame: {ai}")
         
@@ -78,7 +92,6 @@ def create_cody_animation(json_path):
         Ur = Vr - V
         UrCol = vectorize(Ur)        
         
-        start = time.time()
         # Newton iterations
         for i in range(max_iter):
             # Current state
@@ -115,13 +128,14 @@ def create_cody_animation(json_path):
             # Solve system
             dUc = spla.spsolve(AA, b)[:tmp_g.shape[0]]
             
+            # flag = time.time()
+            # print(f"    M-compute : {flag - start:.5f} sec")
+            # start = flag
+            
             # Check convergence
             if tmp_g @ dUc > -1e-6:
                 break
             
-            # flag = time.time()
-            # print(f"    M-compute : {flag - start:.5f} sec")
-            # start = flag
             
             # Line search
             def f(UrColi, UcColi):
@@ -148,6 +162,9 @@ def create_cody_animation(json_path):
         Vn_list.append(Vn)
 
     # np.save('elephant',Vn_list)
+    end = time.time()
+    print(f"Total : {end - start:.5f} sec")
+
     return Vn_list, F
 
 def render_animation(Vn_list, F):
@@ -158,7 +175,7 @@ def render_animation(Vn_list, F):
         mesh.points = Vn_list[i]
         plt.render()
 
-    plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True)
+    plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=17)
     plt += [mesh]
     plt.set_frame(0)
     plt.show()

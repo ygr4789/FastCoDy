@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange
 
 from .kron import kron_dphidX_eye3
 
@@ -21,13 +21,16 @@ def linear_tet_arap_q(q, element, dphidX, param, volume):
     B = kron_dphidX_eye3(dphidX)
     F = (B @ qe).reshape(3, 3).T
     return volume * psi_stretch_F(F, psi_arap_S, param)
-
-@njit
+    
+@njit(parallel=True)
 def linear_tetmesh_arap_q(V, E, q, dphidX_all, volume, params):
-    total_energy = 0.0
-    for i in range(E.shape[0]):
-        element = E[i]
-        dphidX = dphidX_all[i].reshape(3, 4)
-        param = params[i] if params.ndim == 1 else params[i, 0]
-        total_energy += linear_tet_arap_q(q, element, dphidX, param, volume[i])
-    return total_energy
+    num_tets = E.shape[0]
+    energy_all = np.zeros(num_tets, dtype=np.float64)
+    
+    for t in prange(num_tets):
+        element = E[t]
+        dphidX = dphidX_all[t].reshape(3, 4)
+        param = params[t, 0]
+        energy_all[t] = linear_tet_arap_q(q, element, dphidX, param, volume[t])
+        
+    return energy_all.sum()

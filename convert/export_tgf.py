@@ -37,7 +37,7 @@ def export_tgf(file_path, export_path, armature_name = "Armature"):
 
         parent = bone.parent.name if bone.parent else None
         if parent and tail_added[parent]:
-            joint_indices[(bone.name, 'head')] = joint_indices[(parent.name, 'tail')]
+            joint_indices[(bone.name, 'head')] = joint_indices[(parent, 'tail')]
             head_added[bone.name] = True
             continue  # Skip adding head if parent's tail is already added
 

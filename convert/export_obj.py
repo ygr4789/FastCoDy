@@ -10,7 +10,7 @@ def export_obj(file_path, export_path):
         export_normals=True,
         export_uv=False,
         export_colors=False,
-        forward_axis='X',
+        forward_axis='Y',
         up_axis='Z'
     )
     
