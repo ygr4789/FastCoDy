@@ -16,14 +16,14 @@ import time
 # sys.path.append("./pybind/build")
 # import pyBartels
 
-def create_cody_animation(json_path):
+def create_cody_animation(json_path, original_motion=False):
     # Load mesh and animation data
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
     lambda_, mu = emu_to_lame(YM, pr)
 
     params = np.zeros((T.shape[0], 2))
-    params[:, 0] = 0.5 * lambda_
-    # params[:, 0] = lambda_
+    # params[:, 0] = 0.5 * lambda_
+    params[:, 0] = 5 * lambda_
     params[:, 1] = mu
 
     # === Boundary faces and LBS Matrix ===
@@ -40,16 +40,6 @@ def create_cody_animation(json_path):
     M = lumped_mass_matrix(V, T)
     M *= 1000
     # M *= 10000
-
-    # === Linear Blend Skinning A matrix ===
-    A = lbs_matrix_column(V, W)
-
-    # === Poisson Constraint Mask ===
-    phi = create_mask_matrix(V, T)
-
-    # === Constraint system ===
-    Aeq = A.T @ M @ phi
-    Beq = np.zeros(Aeq.shape[0])
 
     # === Initial Transformation ===
     TF = TF_list[0]
@@ -68,15 +58,22 @@ def create_cody_animation(json_path):
     Vn_list = []
 
     # ---------------------------------------------------
-    Vr = VM @ TF
-    Ur = Vr - V
-    UrCol = vectorize(Ur)
-    q = VCol + UrCol + UcCol
     print(f"compiling njax...")
-    G = linear_tetmesh_arap_dq(V, T, q, dX, vol, params)
-    K = linear_tetmesh_arap_dq2(V, T, q, dX, vol, params)
-    e = linear_tetmesh_arap_q(V, T, q, dX, vol, params)
+    G = linear_tetmesh_arap_dq(V, T, VCol, dX, vol, params)
+    K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
+    e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
     # ---------------------------------------------------
+    
+    # === Poisson Constraint Mask ===
+    # phi = create_mask_matrix(V, T, C, BE, 'lin')
+    phi = create_mask_matrix(V, T, C, BE)
+
+    # === Constraint system ===
+    EMW = create_eigenmode_weights(K, M, 10)
+    A = lbs_matrix_column(V, EMW)
+    # A = lbs_matrix_column(V, W)
+    Aeq = A.T @ M @ phi
+    Beq = np.zeros(Aeq.shape[0])
         
     start = time.time()
     for ai, TF in enumerate(TF_list):
@@ -94,6 +91,8 @@ def create_cody_animation(json_path):
         
         # Newton iterations
         for i in range(max_iter):
+            if original_motion: break
+            
             # Current state
             # print(f"  iter {i}")
             q = VCol + UrCol + UcCol
@@ -174,11 +173,17 @@ def render_animation(Vn_list, F):
         # update block and spring position at frame i
         mesh.points = Vn_list[i]
         plt.render()
+        
+    camera_settings = dict(
+        pos=(10, 0, 0),           # Camera position
+        focalPoint=(0, 0, 0),    # Look-at target
+        viewup=(0, 0, 1)         # "Up" direction
+    )
 
-    plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=17)
+    plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=33)
     plt += [mesh]
     plt.set_frame(0)
-    plt.show()
+    plt.show(camera=camera_settings)
     plt.close()
 
 if __name__ == "__main__":
@@ -198,7 +203,8 @@ if __name__ == "__main__":
         Vn_list = data["anim"]
         F = data["faces"]
     elif input_path:
-        Vn_list, F = create_cody_animation(input_path)
+        # Vn_list, F = create_cody_animation(input_path)
+        Vn_list, F = create_cody_animation(input_path, original_motion=True)
         if output_path:
             np.savez(output_path, anim=Vn_list, faces=F)
             

@@ -8,73 +8,65 @@ if __name__ == "__main__":
 else:
     from .lumped_mass_matrix import compute_vertex_voronoi_volumes
 
-def create_mask_matrix(V, T, C=None, BE=None, flag="poisson"):
-    """
-    Create a Poisson mask matrix phi (3N x 3N) as a diagonal sparse matrix.
-
-    Args:
-        V: (N, 3) vertex positions
-        T: (M, 4) tetrahedra
-
-    Returns:
-        phi: (3N, 3N) sparse diagonal mask matrix
-    """
-    # Cotangent Laplacian and mass matrix
-    L = igl.cotmatrix(V, T)
-    # M = igl.massmatrix(V, T, igl.MASSMATRIX_TYPE_DEFAULT)
+def create_mask_matrix(V, T, C=None, BE=None, mask_type="poisson"):
     M = compute_vertex_voronoi_volumes(V, T)
-
-    # Identify boundary vertex indices
-    F = igl.boundary_facets(T)
-    b = np.unique(F.flatten())
-
-    # Solve Poisson system with boundary constraints
-    bc = np.zeros(len(b))
-    Q = -L
-
-    Aeq = sp.csc_matrix((0, Q.shape[0]))
-    Beq = np.array([])  
-
-    _, Z = igl.min_quad_with_fixed(Q, M, b, bc, Aeq, Beq, False)
-
-    # Multiply solution by mass matrix
-    Z_mass = M * Z
-
-    # Build diagonal mask (here: it's a zero diagonal matrix)
-    ZZ = np.zeros(3 * Z_mass.shape[0])
     
-    # Optional: use Z to weight mask if needed
-    for i in range(Z_mass.shape[0]):
-        # if V[i][2] > 0.5:
-        #     ZZ[3 * i + 0] = 0.0
-        #     ZZ[3 * i + 1] = 0.0
-        #     ZZ[3 * i + 2] = 0.0
-        # elif V[i][2] < -0.5:
-        #     ZZ[3 * i + 0] = 1.0
-        #     ZZ[3 * i + 1] = 1.0
-        #     ZZ[3 * i + 2] = 1.0
-        # else:
-        #     w = (0.5 - V[i][2]) / 1
-        #     ZZ[3 * i + 0] = w
-        #     ZZ[3 * i + 1] = w
-        #     ZZ[3 * i + 2] = w
+    if mask_type == "lin":
+        Z = linear_weights(V, T, M)
+    elif mask_type == "rig":
+        Z = rig_ortho_weights(V, T, C, BE)
+    else:
+        Z = poisson_weights(V, T, M)
+    
+    ZZ = np.zeros(3 * Z.shape[0])
+    
+    for i in range(Z.shape[0]):
         ZZ[3 * i + 0] = Z[i]
         ZZ[3 * i + 1] = Z[i]
         ZZ[3 * i + 2] = Z[i]
 
     phi = sp.diags(ZZ, offsets=0, shape=(3 * V.shape[0], 3 * V.shape[0]), format='csr')
     return phi
+    
+def linear_weights(V, T, M):
+    Z = np.zeros(V.shape[0])
+    for i in range(V.shape[0]):
+        top = 0.5
+        bot = -0.5
+        if V[i][2] > top: Z[i] = 0.0
+        elif V[i][2] < bot: Z[i] = 1.0
+        # else: Z[i] = 0.0
+        else: Z[i] = (top - V[i][2]) / (top - bot)
+    return M * Z
+    # return Z
+    
+def rig_ortho_weights(V, T, C, BE):
+    pass
 
+def poisson_weights(V, T, M):
+    L = igl.cotmatrix(V, T)
+    F = igl.boundary_facets(T)
+    b = np.unique(F.flatten())
+    bc = np.zeros((len(b), 1))
+
+    Q = -L
+    Aeq = sp.csc_matrix((0, Q.shape[0]))
+    Beq = np.array([])  
+
+    _, Z = igl.min_quad_with_fixed(Q, M, b, bc, Aeq, Beq, False)
+    return M * Z
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='calculate cody constrint mask weights')
     parser.add_argument('--input', '-i', type=str, required=False, default='examples/sphere/sphere.json', help='json input path')
+    parser.add_argument('--type', '-t', type=str, required=False, default='poisson', help='mask type')
     args = parser.parse_args()
     json_path = args.input
+    mask_type = args.type
 
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
-    phi = create_mask_matrix(V, T)
+    phi = create_mask_matrix(V, T, mask_type=mask_type)
     phi_diag = phi.diagonal() 
     Z = phi_diag[::3]
     
@@ -84,5 +76,11 @@ if __name__ == "__main__":
     pc.pointdata["scalars"] = Z
     pc.cmap("viridis").add_scalarbar(title="weight")
 
+    camera_settings = dict(
+        pos=(10, 0, 0),           # Camera position
+        focalPoint=(0, 0, 0),    # Look-at target
+        viewup=(0, 0, 1)         # "Up" direction
+    )
+
     plotter = Plotter()
-    plotter.show(pc, interactive = True)
+    plotter.show(pc, camera=camera_settings, interactive = True)
