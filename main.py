@@ -39,7 +39,6 @@ def create_cody_animation(json_path, original_motion=False):
     # === Mass Matrix ===
     M = lumped_mass_matrix(V, T)
     M *= 1000
-    # M *= 10000
 
     # === Initial Transformation ===
     TF = TF_list[0]
@@ -58,22 +57,23 @@ def create_cody_animation(json_path, original_motion=False):
     Vn_list = []
 
     # ---------------------------------------------------
-    print(f"compiling njax...")
-    G = linear_tetmesh_arap_dq(V, T, VCol, dX, vol, params)
-    K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
-    e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
-    # ---------------------------------------------------
-    
-    # === Poisson Constraint Mask ===
-    # phi = create_mask_matrix(V, T, C, BE, 'lin')
-    phi = create_mask_matrix(V, T, C, BE)
+    if not original_motion:
+        print(f"compiling njax...")
+        G = linear_tetmesh_arap_dq(V, T, VCol, dX, vol, params)
+        K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
+        e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
+        
+        # === Poisson Constraint Mask ===
+        phi = create_mask_matrix(V, T, C, BE, 'lin')
+        # phi = create_mask_matrix(V, T, C, BE)
 
-    # === Constraint system ===
-    EMW = create_eigenmode_weights(K, M, 10)
-    A = lbs_matrix_column(V, EMW)
-    # A = lbs_matrix_column(V, W)
-    Aeq = A.T @ M @ phi
-    Beq = np.zeros(Aeq.shape[0])
+        # === Constraint system ===
+        EMW = create_eigenmode_weights(K, M, 10)
+        A = lbs_matrix_column(V, EMW)
+        # A = lbs_matrix_column(V, W)
+        Aeq = A.T @ M @ phi
+        Beq = np.zeros(Aeq.shape[0])
+    # ---------------------------------------------------
         
     start = time.time()
     for ai, TF in enumerate(TF_list):
@@ -183,6 +183,7 @@ def render_animation(Vn_list, F):
     plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=33)
     plt += [mesh]
     plt.set_frame(0)
+    # plt.show()
     plt.show(camera=camera_settings)
     plt.close()
 
@@ -192,11 +193,13 @@ if __name__ == "__main__":
     parser.add_argument('--input', '-i', type=str, required=False, default='examples/sphere/sphere.json', help='json input path')
     parser.add_argument('--output', '-o', type=str, required=False, help='output path')
     parser.add_argument('--data', '-d', type=str, required=False, help='prebuilt data')
+    parser.add_argument('--none', '-n', action="store_true", required=False, default=False, help='no secondary motion')
     
     args = parser.parse_args()
     input_path = args.input
     output_path = args.output
     data = args.data
+    original_motion = args.none
     
     if data:
         data = np.load(data)
@@ -204,7 +207,7 @@ if __name__ == "__main__":
         F = data["faces"]
     elif input_path:
         # Vn_list, F = create_cody_animation(input_path)
-        Vn_list, F = create_cody_animation(input_path, original_motion=True)
+        Vn_list, F = create_cody_animation(input_path, original_motion)
         if output_path:
             np.savez(output_path, anim=Vn_list, faces=F)
             

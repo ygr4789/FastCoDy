@@ -2,8 +2,8 @@ import numpy as np
 import igl
 from scipy.sparse.linalg import eigsh
 
-from vedo import Points
-from vedo.applications import AnimationPlayer
+from vedo import Points, Plotter
+# from vedo.applications import AnimationPlayer
 
 if __name__ == "__main__":
     import sys, os
@@ -55,9 +55,26 @@ def create_eigenmode_weights(K, M, n=10):
     eigvals, eigvecs = eigsh(invM * KW, k=n, which='SM')
     return eigvecs
 
+def visualize_eigenmodes(V, EMs):
+    num_modes = EMs.shape[0]
+    rows = int(np.sqrt(num_modes))
+    cols = int(np.ceil(num_modes / rows))
+
+    plotter = Plotter(shape=(rows, cols), title="Eigenmodes")
+
+    camera_settings = dict(
+        pos=(10, 0, 0),
+        focalPoint=(0, 0, 0),
+        viewup=(0, 0, 1)
+    )
+    for i in range(num_modes):
+        pc = Points(V, c='green', r=4)
+        pc.pointdata["scalars"] = EMs[i]
+        pc.cmap("viridis", vmin=-0.1, vmax=0.1).add_scalarbar(title="weight")
+        plotter.show(pc, at=i, interactive=False, camera=camera_settings)
+    plotter.interactive().close()
+
 if __name__ == "__main__":
-    
-    
     import argparse
     parser = argparse.ArgumentParser(description='generate complementary dynamics secondary motion')
     parser.add_argument('--input', '-i', type=str, required=True, default='examples/sphere/sphere.json', help='json input path')
@@ -77,24 +94,5 @@ if __name__ == "__main__":
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
     
-    EMs = create_eigenmode_weights(K, M, 30).T
-    
-    pc = Points(V, r=8)
-    pc.pointdata["scalars"] = EMs[0]
-    pc.cmap("viridis").add_scalarbar(title="weight")
-
-    def update_scene(i: int):
-        pc.pointdata["scalars"] = EMs[i]
-        plt.render()
-        
-    camera_settings = dict(
-        pos=(10, 0, 0),
-        focalPoint=(0, 0, 0),
-        viewup=(0, 0, 1)
-    )
-
-    plt = AnimationPlayer(update_scene, irange=[0,len(EMs)], loop=True, dt=17)
-    plt += [pc]
-    plt.set_frame(0)
-    plt.show(camera=camera_settings)
-    plt.close()
+    EMs = create_eigenmode_weights(K, M, 12).T
+    visualize_eigenmodes(V, EMs)

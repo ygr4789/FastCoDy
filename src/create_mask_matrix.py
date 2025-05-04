@@ -50,10 +50,11 @@ def poisson_weights(V, T, M):
     bc = np.zeros((len(b), 1))
 
     Q = -L
+    l = -M * 10000
     Aeq = sp.csc_matrix((0, Q.shape[0]))
     Beq = np.array([])  
 
-    _, Z = igl.min_quad_with_fixed(Q, M, b, bc, Aeq, Beq, False)
+    _, Z = igl.min_quad_with_fixed(Q, l, b, bc, Aeq, Beq, False)
     return M * Z
 
 if __name__ == "__main__":
