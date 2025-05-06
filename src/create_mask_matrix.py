@@ -35,8 +35,8 @@ def linear_weights(V, T, M):
         bot = -0.5
         if V[i][2] > top: Z[i] = 0.0
         elif V[i][2] < bot: Z[i] = 1.0
-        # else: Z[i] = 0.0
-        else: Z[i] = (top - V[i][2]) / (top - bot)
+        else: Z[i] = 0.0
+        # else: Z[i] = (top - V[i][2]) / (top - bot)
     return M * Z
     # return Z
     

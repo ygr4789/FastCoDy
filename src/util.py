@@ -4,7 +4,7 @@ def emu_to_lame(E, p):
     return lambda_, mu
 
 def vectorize(M):
-    return M.T.reshape(-1, order='F')  # 'F' for column-major
+    return M.reshape(-1)
 
 def matrixize(V):
     return V.reshape((3, -1), order='F').T  # Transpose to get (N, 3)
