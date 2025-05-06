@@ -68,7 +68,7 @@ def create_cody_animation(json_path, original_motion=False):
     # ---------------------------------------------------
     
     start = time.time()
-    solver = arap_solver(V, T, J, A, Aeq, params[:, 0], dt*dt)
+    solver = arap_solver(V, T, J, A, Aeq, params[:, 0]*1e-4, dt*dt)
     z = np.zeros(A.shape[1])
     p = TF.T.flatten()
     st = sim_state(z, p)
