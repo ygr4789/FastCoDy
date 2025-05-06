@@ -44,44 +44,44 @@ def create_cody_animation(json_path, original_motion=False):
     Vr = VM @ TF
     U = Vr - V
 
-    UCol = vectorize(U)
     VCol = vectorize(V)
-
     Vn_list = []
 
     # ---------------------------------------------------
     if not original_motion:
         print(f"compiling njax...")
         # G = linear_tetmesh_arap_dq(V, T, VCol, dX, vol, params)
-        # K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
+        K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
         # e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
         
         # === Poisson Constraint Mask ===
-        # phi = create_mask_matrix(V, T, C, BE, 'lin')
-        phi = create_mask_matrix(V, T, C, BE)
+        phi = create_mask_matrix(V, T, C, BE, 'lin')
+        # phi = create_mask_matrix(V, T, C, BE)
 
         # === Constraint system ===
-        # EMW = create_eigenmode_weights(K, M, 3)
-        # A = lbs_matrix_column(V, EMW)
+        EMW = create_eigenmode_weights(K, M, 10)
+        A = lbs_matrix_column(V, EMW)
         J = lbs_matrix_column(V, W)
         Aeq = J.T @ M @ phi
-        # Aeq = A.T @ M @ phi
+        # Aeq = J.T @ M @ phi
         Beq = np.zeros(Aeq.shape[0])
     # ---------------------------------------------------
     
     start = time.time()
-    solver = arap_solver(V, T, J, Aeq, params[:, 0] * 1e-10, dt*dt)
+    solver = arap_solver(V, T, J, A, Aeq, params[:, 0], dt*dt)
+    z = np.zeros(A.shape[1])
     p = TF.T.flatten()
-    st = sim_state(UCol, p)
+    st = sim_state(z, p)
     
     for ai, TF in enumerate(TF_list):
         p = TF.T.flatten()
         print(f"frame: {ai}")
-        st.update(UCol, p)
-        UCol = solver.step(UCol, p, st, Beq)
+        st.update(z, p)
+        z = solver.step(z, p, st, Beq)
         
         # Store result
-        Vn = matrixize(J * p) + matrixize(UCol)
+        VCol = J * p + A * z
+        Vn = matrixize(VCol)
         Vn_list.append(Vn)
 
     # np.save('elephant',Vn_list)
@@ -99,7 +99,7 @@ def render_animation(Vn_list, F):
         plt.render()
         
     camera_settings = dict(
-        pos=(10, 0, 0),          # Camera position
+        pos=(10, 0, 0),           # Camera position
         focalPoint=(0, 0, 0),    # Look-at target
         viewup=(0, 0, 1)         # "Up" direction
     )
@@ -107,8 +107,8 @@ def render_animation(Vn_list, F):
     plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=33)
     plt += [mesh]
     plt.set_frame(0)
-    plt.show()
-    # plt.show(camera=camera_settings)
+    # plt.show()
+    plt.show(camera=camera_settings)
     plt.close()
 
 if __name__ == "__main__":

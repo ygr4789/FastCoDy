@@ -15,12 +15,8 @@ class arap_precomp_dynamic:
     z_hist = 2.0 * st.z_curr - st.z_prev
     p_hist = 2.0 * st.p_curr - st.p_prev
 
-    self.Cur = self.sp.CJ * p - self.sp.Cx
-    self.Mur = self.sp.MJ * p - self.sp.Mx
-    self.VKur = self.sp.VKJ * p - self.sp.VKx
-    self.Kur = self.sp.KJ * p - self.sp.Kx
+    self.BtCJp = self.sp.BtCJ * p
+    self.KJp = self.sp.KJ * p
 
-    Mp_hist = (self.sp.MJ * p_hist)
-    rig_momentum_terms = Mp_hist - self.sp.MJ * p
-    
-    self.My = self.sp.M * z_hist + rig_momentum_terms
+    rig_momentum_terms = self.sp.BtMJ * (p - p_hist)
+    self.inertia_grad = rig_momentum_terms - self.sp.BtMB * z_hist 

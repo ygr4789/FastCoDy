@@ -1,5 +1,6 @@
 import numpy as np
 import igl
+from scipy.linalg import svd, eigh
 from scipy.sparse.linalg import eigsh
 
 from vedo import Points, Plotter
@@ -46,7 +47,34 @@ def lumped_mass_3n_to_n_x_only(M_3n):
     M_n = np.diag(lumped_masses)
     return M_n
 
+def solve_generalized_eig(H, J, M, n=10, tol=1e-12):
+    # Find null space of J.T
+    U, S, Vh = svd(J.T)
+    null_mask = (S < tol)
+    null_space = Vh[null_mask].T  # null_space is shape (n, k), where k = dim of null space
+
+    # Project H and M into the null space
+    H_proj = null_space.T @ H @ null_space
+    M_proj = null_space.T @ M @ null_space
+
+    # Solve generalized eigenproblem in reduced space
+    eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, which='SM')
+
+    # Recover full-space eigenvectors
+    full_space_evecs = null_space @ eigvecs
+
+    return full_space_evecs
+
 def create_eigenmode_weights(K, M, n=10):
+    M = lumped_mass_3n_to_n_x_only(M)
+    invM = np.linalg.inv(M)
+    invM = np.sqrt(invM)
+
+    KW = sum_diagonal_blocks(reorder_hessian_xyz_to_xxyyzz(K))
+    eigvals, eigvecs = eigsh(invM * KW, k=n, which='SM')
+    return eigvecs
+
+def create_rig_ortho_eigenmode_weights(K, M, Jw, n=10):
     M = lumped_mass_3n_to_n_x_only(M)
     invM = np.linalg.inv(M)
     invM = np.sqrt(invM)
