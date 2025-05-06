@@ -5,3 +5,4 @@ from .lumped_mass_matrix import lumped_mass_matrix
 from .create_mask_matrix import create_mask_matrix
 from .eigenmode import create_eigenmode_weights
 from .line_search import line_search
+from .weight_space_constraint import weight_space_constraint

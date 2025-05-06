@@ -1,7 +1,7 @@
 import numpy as np
 import igl
-from scipy.linalg import svd, eigh
-from scipy.sparse.linalg import eigsh
+from scipy.linalg import null_space
+from scipy.sparse.linalg import svds, eigsh
 
 from vedo import Points, Plotter
 # from vedo.applications import AnimationPlayer
@@ -39,7 +39,7 @@ def sum_diagonal_blocks(H_reordered):
     H_sum = H_xx + H_yy + H_zz
     return H_sum
 
-def lumped_mass_3n_to_n_x_only(M_3n):
+def lumped_mass_3n_to_n(M_3n):
     n_vertices = M_3n.shape[0] // 3
     lumped_masses = np.zeros(n_vertices)
     for i in range(n_vertices):
@@ -47,41 +47,29 @@ def lumped_mass_3n_to_n_x_only(M_3n):
     M_n = np.diag(lumped_masses)
     return M_n
 
-def solve_generalized_eig(H, J, M, n=10, tol=1e-12):
-    # Find null space of J.T
-    U, S, Vh = svd(J.T)
-    null_mask = (S < tol)
-    null_space = Vh[null_mask].T  # null_space is shape (n, k), where k = dim of null space
+def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
+    null_J = null_space(J.todense())
 
     # Project H and M into the null space
-    H_proj = null_space.T @ H @ null_space
-    M_proj = null_space.T @ M @ null_space
+    H_proj = null_J.T @ H @ null_J
+    M_proj = null_J.T @ M @ null_J
 
     # Solve generalized eigenproblem in reduced space
     eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, which='SM')
 
     # Recover full-space eigenvectors
-    full_space_evecs = null_space @ eigvecs
-
+    full_space_evecs = null_J @ eigvecs
     return full_space_evecs
 
-def create_eigenmode_weights(K, M, n=10):
-    M = lumped_mass_3n_to_n_x_only(M)
-    invM = np.linalg.inv(M)
-    invM = np.sqrt(invM)
-
+def create_eigenmode_weights(K, M, J=None, n=10):
+    M = lumped_mass_3n_to_n(M)
     KW = sum_diagonal_blocks(reorder_hessian_xyz_to_xxyyzz(K))
-    eigvals, eigvecs = eigsh(invM * KW, k=n, which='SM')
-    return eigvecs
-
-def create_rig_ortho_eigenmode_weights(K, M, Jw, n=10):
-    M = lumped_mass_3n_to_n_x_only(M)
-    invM = np.linalg.inv(M)
-    invM = np.sqrt(invM)
-
-    KW = sum_diagonal_blocks(reorder_hessian_xyz_to_xxyyzz(K))
-    eigvals, eigvecs = eigsh(invM * KW, k=n, which='SM')
-    return eigvecs
+    
+    if J is not None:
+        return solve_generalized_eig(KW, M, J, n)
+    else:
+        eigvals, eigvecs = eigsh(KW, k=n, M=M, which='SM')
+        return eigvecs
 
 def visualize_eigenmodes(V, EMs):
     num_modes = EMs.shape[0]
@@ -98,7 +86,7 @@ def visualize_eigenmodes(V, EMs):
     for i in range(num_modes):
         pc = Points(V, c='green', r=4)
         pc.pointdata["scalars"] = EMs[i]
-        pc.cmap("viridis", vmin=-0.1, vmax=0.1).add_scalarbar(title="weight")
+        pc.cmap("viridis", vmin=-10.0, vmax=10.0).add_scalarbar(title="weight")
         plotter.show(pc, at=i, interactive=False, camera=camera_settings)
     plotter.interactive().close()
 
@@ -121,6 +109,11 @@ if __name__ == "__main__":
     VCol = vectorize(V)
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
+    J = lbs_matrix_column(V, W)
+    phi = create_mask_matrix(V, T, C, BE)
+    Jleak = phi @ M @ J
     
-    EMs = create_eigenmode_weights(K, M, 12).T
+    Jw = weight_space_constraint(Jleak, V)
+    
+    EMs = create_eigenmode_weights(K, M, Jw, n=12).T
     visualize_eigenmodes(V, EMs)

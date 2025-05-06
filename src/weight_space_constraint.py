@@ -1,38 +1,42 @@
 import numpy as np
+import scipy.sparse as sp
 
 def weight_space_constraint(J, V):
     n = V.shape[0]
     p = J.shape[1]
 
-    I = np.eye(n)
-    zeros = np.zeros_like(I)
+    # Convert J to sparse if not already
+    if not sp.issparse(J):
+        J = sp.csr_matrix(J)
 
-    # 3n x n projection matrices
-    Px = np.vstack([I, zeros, zeros])
-    Py = np.vstack([zeros, I, zeros])
-    Pz = np.vstack([zeros, zeros, I])
+    # Identity matrix
+    I = sp.eye(n, format='csr')
+    Z = sp.csr_matrix((n, n))
 
-    # Diagonal vertex position matrices
-    X = np.diag(V[:, 0])
-    Y = np.diag(V[:, 1])
-    Z = np.diag(V[:, 2])
+    # 3n x n projection matrices using block structure
+    Px = sp.vstack([I, Z, Z], format='csr')  # shape: (3n, n)
+    Py = sp.vstack([Z, I, Z], format='csr')
+    Pz = sp.vstack([Z, Z, I], format='csr')
 
-    # Compute Aij blocks
-    A11 = Px @ X; A12 = Px @ Y; A13 = Px @ Z; A14 = Px
-    A21 = Py @ X; A22 = Py @ Y; A23 = Py @ Z; A24 = Py
-    A31 = Pz @ X; A32 = Pz @ Y; A33 = Pz @ Z; A34 = Pz
+    # Diagonal sparse matrices from vertex positions
+    X = sp.diags(V[:, 0])
+    Y = sp.diags(V[:, 1])
+    Z_ = sp.diags(V[:, 2])
 
-    # Compute JTij
-    JT11 = J.T @ A11; JT12 = J.T @ A12; JT13 = J.T @ A13; JT14 = J.T @ A14
-    JT21 = J.T @ A21; JT22 = J.T @ A22; JT23 = J.T @ A23; JT24 = J.T @ A24
-    JT31 = J.T @ A31; JT32 = J.T @ A32; JT33 = J.T @ A33; JT34 = J.T @ A34
+    # Aij blocks: shape (3n, n)
+    A11 = Px @ X; A12 = Px @ Y; A13 = Px @ Z_; A14 = Px
+    A21 = Py @ X; A22 = Py @ Y; A23 = Py @ Z_; A24 = Py
+    A31 = Pz @ X; A32 = Pz @ Y; A33 = Pz @ Z_; A34 = Pz
 
-    # Stack vertically
-    Jw = np.vstack([
-        JT11, JT21, JT31,
-        JT12, JT22, JT32,
-        JT13, JT23, JT33,
-        JT14, JT24, JT34
-    ])
+    # JTij: shape (p, n)
+    def JT(Aij): return J.T @ Aij  # Use sparse matmul
 
+    JT_blocks = [
+        JT(A11), JT(A21), JT(A31),
+        JT(A12), JT(A22), JT(A32),
+        JT(A13), JT(A23), JT(A33),
+        JT(A14), JT(A24), JT(A34),
+    ]
+
+    Jw = sp.vstack(JT_blocks, format='csr')
     return Jw  # shape: (12p, n)

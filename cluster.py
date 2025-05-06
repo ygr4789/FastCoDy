@@ -20,10 +20,12 @@ import time
 def create_cody_animation(json_path, original_motion=False):
     # Load mesh and animation data
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
-    lambda_, mu = emu_to_lame(YM, pr)
+    # lambda_, mu = emu_to_lame(YM, pr)
+    lambda_ = 1
+    mu = 1e-5
 
     params = np.zeros((T.shape[0], 2))
-    params[:, 0] = 0.5 * lambda_
+    params[:, 0] = lambda_
     params[:, 1] = mu
 
     # === Boundary faces and LBS Matrix ===
@@ -37,7 +39,6 @@ def create_cody_animation(json_path, original_motion=False):
 
     # === Mass Matrix ===
     M = lumped_mass_matrix(V, T)
-    M *= 1000
 
     # === Initial Transformation ===
     TF = TF_list[0]
@@ -55,21 +56,24 @@ def create_cody_animation(json_path, original_motion=False):
         # e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
         
         # === Poisson Constraint Mask ===
-        phi = create_mask_matrix(V, T, C, BE, 'lin')
-        # phi = create_mask_matrix(V, T, C, BE)
+        # phi = create_mask_matrix(V, T, C, BE, 'lin')
+        phi = create_mask_matrix(V, T, C, BE)
 
         # === Constraint system ===
-        EMW = create_eigenmode_weights(K, M, 10)
-        A = lbs_matrix_column(V, EMW)
         J = lbs_matrix_column(V, W)
-        Aeq = J.T @ M @ phi
-        # Aeq = J.T @ M @ phi
-        Beq = np.zeros(Aeq.shape[0])
+        Jleak = M @ phi @ J
+        Jw = weight_space_constraint(Jleak, V)
+        
+        # EMW = create_eigenmode_weights(K, M, Jw, n=10)
+        EMW = create_eigenmode_weights(K, M, n=20)
+        B = lbs_matrix_column(V, EMW)
+        
+        Beq = np.zeros(Jleak.T.shape[0])
     # ---------------------------------------------------
     
     start = time.time()
-    solver = arap_solver(V, T, J, A, Aeq, params[:, 0]*1e-4, dt*dt)
-    z = np.zeros(A.shape[1])
+    solver = arap_solver(V, T, J, B, Jleak.T, params[:, 1], dt*dt)
+    z = np.zeros(B.shape[1])
     p = TF.T.flatten()
     st = sim_state(z, p)
     
@@ -80,7 +84,7 @@ def create_cody_animation(json_path, original_motion=False):
         z = solver.step(z, p, st, Beq)
         
         # Store result
-        VCol = J * p + A * z
+        VCol = J * p + B * z
         Vn = matrixize(VCol)
         Vn_list.append(Vn)
 
