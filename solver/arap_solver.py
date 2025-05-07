@@ -26,11 +26,14 @@ class arap_solver:
     
     while True:
       z_prev = z_next
-      r = self.local_step(z)
-      z_next = self.global_step(z, r, p)
+      r = self.local_step(z_prev)
+      z_next = self.global_step(z_prev, r, p)
       res = np.linalg.norm(z_next - z_prev)
+      iter += 1
       if iter > self.max_iter: break
       if res < self.threshold: break
+      
+    print(iter)
     
     return z_next
     

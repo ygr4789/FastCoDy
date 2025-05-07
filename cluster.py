@@ -22,7 +22,9 @@ def create_cody_animation(json_path, original_motion=False):
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
     # lambda_, mu = emu_to_lame(YM, pr)
     lambda_ = 1
-    mu = 1e-5
+    # mu = 3e-5 # lin mic
+    # mu = 3e-6 # poi mic
+    mu = 3e-6 # poi elephant
 
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = lambda_
@@ -47,7 +49,7 @@ def create_cody_animation(json_path, original_motion=False):
 
     VCol = vectorize(V)
     Vn_list = []
-
+    V0n_list = [] = []
     # ---------------------------------------------------
     if not original_motion:
         print(f"compiling njax...")
@@ -62,9 +64,11 @@ def create_cody_animation(json_path, original_motion=False):
         # === Constraint system ===
         J = lbs_matrix_column(V, W)
         Jleak = M @ phi @ J
-        Jw = weight_space_constraint(Jleak, V)
+        # Jw = weight_space_constraint(Jleak, V)
+        Jw = W.T @ lumped_mass_3n_to_n(phi)
         
-        # EMW = create_eigenmode_weights(K, M, Jw, n=10)
+        # EMW = create_eigenmode_weights(K, M, Jw.todense(), n=20)
+        # EMW = create_eigenmode_weights(K, M, Jw, n=20)
         EMW = create_eigenmode_weights(K, M, n=20)
         B = lbs_matrix_column(V, EMW)
         
@@ -77,29 +81,40 @@ def create_cody_animation(json_path, original_motion=False):
     p = TF.T.flatten()
     st = sim_state(z, p)
     
+    np.set_printoptions(threshold=100)
+    
     for ai, TF in enumerate(TF_list):
         p = TF.T.flatten()
         print(f"frame: {ai}")
-        st.update(z, p)
         z = solver.step(z, p, st, Beq)
+        st.update(z, p)
         
         # Store result
-        VCol = J * p + B * z
+        V0Col = J * p
+        UCol = B * z
+        VCol = V0Col + UCol
+        
+        V0n = matrixize(V0Col)
         Vn = matrixize(VCol)
+        print(np.average(np.abs(z)))
+        
+        V0n_list.append(V0n)
         Vn_list.append(Vn)
 
     # np.save('elephant',Vn_list)
     end = time.time()
     print(f"Total : {end - start:.5f} sec")
 
-    return Vn_list, F
+    return Vn_list, V0n_list, F
 
-def render_animation(Vn_list, F):
+def render_animation(Vn_list, V0n_list, F):
     mesh = Mesh([Vn_list[0], F])
+    mesh0 = Mesh([V0n_list[0], F], alpha=0.1, c='blue')
 
     def update_scene(i: int):
         # update block and spring position at frame i
         mesh.points = Vn_list[i]
+        mesh0.points = V0n_list[i]
         plt.render()
         
     camera_settings = dict(
@@ -109,10 +124,10 @@ def render_animation(Vn_list, F):
     )
 
     plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=33)
-    plt += [mesh]
+    plt += [mesh, mesh0]
     plt.set_frame(0)
-    # plt.show()
-    plt.show(camera=camera_settings)
+    plt.show()
+    # plt.show(camera=camera_settings)
     plt.close()
 
 if __name__ == "__main__":
@@ -135,8 +150,8 @@ if __name__ == "__main__":
         F = data["faces"]
     elif input_path:
         # Vn_list, F = create_cody_animation(input_path)
-        Vn_list, F = create_cody_animation(input_path, original_motion)
+        Vn_list, V0n_list, F = create_cody_animation(input_path, original_motion)
         if output_path:
             np.savez(output_path, anim=Vn_list, faces=F)
             
-    render_animation(Vn_list, F)
+    render_animation(Vn_list, V0n_list, F)
