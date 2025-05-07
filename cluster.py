@@ -22,9 +22,9 @@ def create_cody_animation(json_path, original_motion=False):
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
     # lambda_, mu = emu_to_lame(YM, pr)
     lambda_ = 1
-    # mu = 3e-5 # lin mic
+    mu = 3e-5 # lin mic
     # mu = 3e-6 # poi mic
-    mu = 3e-6 # poi elephant
+    # mu = 3e-6 # poi elephant
 
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = lambda_
@@ -58,8 +58,8 @@ def create_cody_animation(json_path, original_motion=False):
         # e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
         
         # === Poisson Constraint Mask ===
-        # phi = create_mask_matrix(V, T, C, BE, 'lin')
-        phi = create_mask_matrix(V, T, C, BE)
+        phi = create_mask_matrix(V, T, C, BE, 'lin')
+        # phi = create_mask_matrix(V, T, C, BE)
 
         # === Constraint system ===
         J = lbs_matrix_column(V, W)
@@ -67,9 +67,9 @@ def create_cody_animation(json_path, original_motion=False):
         # Jw = weight_space_constraint(Jleak, V)
         Jw = W.T @ lumped_mass_3n_to_n(phi)
         
-        # EMW = create_eigenmode_weights(K, M, Jw.todense(), n=20)
-        # EMW = create_eigenmode_weights(K, M, Jw, n=20)
-        EMW = create_eigenmode_weights(K, M, n=20)
+        # _, EMW = create_eigenmode_weights(K, M, Jw.todense(), n=20)
+        # _, EMW = create_eigenmode_weights(K, M, Jw, n=20)
+        _, EMW = create_eigenmode_weights(K, M, n=50)
         B = lbs_matrix_column(V, EMW)
         
         Beq = np.zeros(Jleak.T.shape[0])
@@ -96,7 +96,7 @@ def create_cody_animation(json_path, original_motion=False):
         
         V0n = matrixize(V0Col)
         Vn = matrixize(VCol)
-        print(f"  Average offset: {np.average(np.abs(z))}")
+        print(f"  Average Offset : {np.average(np.abs(z)):.2e}")
         
         V0n_list.append(V0n)
         Vn_list.append(Vn)
@@ -127,8 +127,8 @@ def render_animation(Vn_list, V0n_list, F):
     plt = AnimationPlayer(update_scene, irange=[0,len(Vn_list)], loop=True, dt=33)
     plt += [mesh, mesh0]
     plt.set_frame(0)
-    plt.show()
-    # plt.show(camera=camera_settings)
+    # plt.show()
+    plt.show(camera=camera_settings)
     plt.close()
 
 if __name__ == "__main__":

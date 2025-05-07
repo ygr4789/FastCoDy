@@ -2,9 +2,9 @@ import numpy as np
 import igl
 
 from scipy.linalg import null_space
-from scipy.sparse.linalg import svds, eigsh
+from scipy.sparse.linalg import eigsh
 
-from vedo import Points, Plotter
+from vedo import Points, Plotter, TetMesh, show
 # from vedo.applications import AnimationPlayer
 
 if __name__ == "__main__":
@@ -16,8 +16,7 @@ from sim import *
 
 def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
     if J is None:
-        eigvals, eigvecs = eigsh(H, k=n, M=M, which='SM')
-        return eigvecs
+        return eigsh(H, k=n, M=M, which='SM')
     
     # null_J = null_space(J.todense())
     null_J = null_space(J)
@@ -30,8 +29,8 @@ def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
     eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, which='SM')
 
     # Recover full-space eigenvectors
-    full_space_evecs = null_J @ eigvecs
-    return full_space_evecs
+    eigvecs = null_J @ eigvecs
+    return eigvals, eigvecs
 
 def create_eigenmode_weights(K, M, J=None, n=10):
     M = lumped_mass_3n_to_n(M)
@@ -63,7 +62,7 @@ def visualize_eigenmodes(V, EMs):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='generate complementary dynamics secondary motion')
+    parser = argparse.ArgumentParser(description='generate eigenmodes')
     parser.add_argument('--input', '-i', type=str, required=True, default='examples/sphere/sphere.json', help='json input path')
     
     args = parser.parse_args()
@@ -81,15 +80,11 @@ if __name__ == "__main__":
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
     J = lbs_matrix_column(V, W)
-    # phi = create_mask_matrix(V, T, C, BE)
     phi = create_mask_matrix(V, T, C, BE, 'lin')
     
     Jleak = M @ phi @ J
-    # Jw = weight_space_constraint(Jleak, V)
     Jw = W.T @ lumped_mass_3n_to_n(phi)
     
-    # EMs = create_eigenmode_weights(K, M, n=20).T
-    EMs = create_eigenmode_weights(K, M, Jw, n=20).T
-    # EMs = create_eigenmode_weights(K, M, Jw.todense(), n=20).T
-    
-    visualize_eigenmodes(V, EMs)
+    _, EMs = create_eigenmode_weights(K, M, Jw, n=20)
+    visualize_eigenmodes(V, EMs.T)
+

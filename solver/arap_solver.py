@@ -14,7 +14,6 @@ class arap_solver:
     self.threshold = threshold
     self.invh2 = invh2
     
-    # self.dz = X.shape[0] * 3
     self.dz = B.shape[1]
     
   def step(self, z, p, st, bc, f_ext = 0):
@@ -30,10 +29,10 @@ class arap_solver:
       z_next = self.global_step(z_prev, r, p)
       res = np.linalg.norm(z_next - z_prev)
       iter += 1
-      if iter > self.max_iter: break
+      if iter >= self.max_iter: break
       if res < self.threshold: break
       
-    print(f"  Iteration: {iter}")
+    print(f"  Iteration      : {iter}")
     
     return z_next
     
