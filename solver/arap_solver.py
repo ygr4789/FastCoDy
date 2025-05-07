@@ -33,7 +33,7 @@ class arap_solver:
       if iter > self.max_iter: break
       if res < self.threshold: break
       
-    print(iter)
+    print(f"  Iteration: {iter}")
     
     return z_next
     

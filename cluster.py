@@ -96,14 +96,15 @@ def create_cody_animation(json_path, original_motion=False):
         
         V0n = matrixize(V0Col)
         Vn = matrixize(VCol)
-        print(np.average(np.abs(z)))
+        print(f"  Average offset: {np.average(np.abs(z))}")
         
         V0n_list.append(V0n)
         Vn_list.append(Vn)
 
     # np.save('elephant',Vn_list)
     end = time.time()
-    print(f"Total : {end - start:.5f} sec")
+    print(f"Total time    : {end - start:.2f} sec")
+    print(f"Average time  : {(end - start) / len(TF_list):.2f} sec")
 
     return Vn_list, V0n_list, F
 
