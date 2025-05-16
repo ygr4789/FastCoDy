@@ -5,7 +5,7 @@ import scipy.sparse as sp
 from src import lumped_mass_matrix
 
 class arap_precomp_static:
-  def __init__(self, X, T, J, B, Aeq, mu, invh2):
+  def __init__(self, X, T, J, B, G, Aeq, mu, invh2):
     M = lumped_mass_matrix(X, T)
     K, V, Mu = self.deformation_jacobian(X, T, mu)
     C = K.T @ V @ Mu @ K
@@ -18,9 +18,9 @@ class arap_precomp_static:
     ]).tocsr()
     
     self.A = A
-    self.KJ = K @ J
-    self.KB = K @ B
-    self.VKB = V @ Mu @ K @ B
+    self.GKJ = G @ K @ J
+    self.GKB = G @ K @ B
+    self.GVKB = G @ V @ Mu @ K @ B
     self.BtCJ = B.T @ C @ J
     
     self.BtMJ = B.T @ M @ J

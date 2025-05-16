@@ -7,8 +7,8 @@ from scipy.linalg import polar
 from solver import arap_precomp_dynamic, arap_precomp_static
 
 class arap_solver:
-  def __init__(self, X, T, J, B, Aeq, mu, invh2, max_iter = 30, threshold = 1e-8):
-    self.sp = arap_precomp_static(X, T, J, B, Aeq, mu, invh2)
+  def __init__(self, X, T, J, B, G, Aeq, mu, invh2, max_iter = 30, threshold = 1e-8):
+    self.sp = arap_precomp_static(X, T, J, B, G, Aeq, mu, invh2)
     self.dp = arap_precomp_dynamic(self.sp)
     self.max_iter = max_iter
     self.threshold = threshold
@@ -37,7 +37,8 @@ class arap_solver:
     return z_next
     
   def local_step(self, z):
-    f = self.sp.KB @ z + self.dp.KJp  # shape: (9t,)
+    f = self.sp.GKB @ z + self.dp.GKJp  # shape: (9t,)
+    # must be GKUr, not GKJp??
     nt = f.shape[0] // 9 # number of tets
 
     F_stack = f.reshape(nt * 3, 3) # shape: (3 * t, 3)
@@ -52,7 +53,7 @@ class arap_solver:
     return r
     
   def global_step(self, z, r, p):
-    arap_grad = self.dp.BtCJp - self.sp.VKB.T * r
+    arap_grad = self.dp.BtCJp - self.sp.GVKB.T * r
     g = self.dp.inertia_grad * self.invh2 + arap_grad + self.dp.f_ext
 
     rhs = -np.concatenate([g, self.dp.bc], axis=0)

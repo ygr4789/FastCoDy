@@ -5,7 +5,9 @@ from vedo import Plotter, TetMesh, show
 # from vedo.applications import AnimationPlayer
 
 from sklearn.cluster import KMeans
+import scipy.sparse as sp
 import matplotlib.pyplot as plt
+
 
 if __name__ == "__main__":
     import sys, os
@@ -38,7 +40,43 @@ def create_group_matrix(eigvals, eigvecs, T, Vol, n_clusters=100):
         cluster_vol_sum = np.sum(Vol[cluster_tets])
         G[i, cluster_tets] = Vol[cluster_tets] / cluster_vol_sum
     
+    G = G.T
+    G = G / np.sum(G, axis=1)[:, None]
+    G = G.T
     return G
+
+    # distances = np.zeros((n_tets, n_clusters))
+    #     for i in range(n_clusters):
+    #         diff = EVdW2_tet - kmeans.cluster_centers_[i]
+    #         distances[:, i] = np.sum(diff * diff, axis=1)
+        
+    # distances = -distances
+    # exp_distances = np.exp(distances)
+    # G = exp_distances / np.sum(exp_distances, axis=1)[:, None]
+    
+    # G = G * Vol[:, None]
+    # G = G / np.sum(G, axis=1)[:, None]
+    # G = G.T
+    # return G
+
+def create_exploded_group_matrix(G):
+    r, t = G.shape  # r clusters, t tetrahedra
+    
+    row_idx = np.arange(9)[:,None] + 9*np.arange(r)[:,None,None]  # Shape: (r, 1, 9)
+    col_idx = np.arange(9)[:,None] + 9*np.arange(t)[:,None,None]  # Shape: (t, 1, 9)
+    
+    G_values = np.repeat(G.flatten(), 9)
+    
+    rows = row_idx.repeat(t, axis=0).reshape(-1)
+    cols = col_idx.repeat(r, axis=0).reshape(-1)
+    
+    mask = G_values != 0
+    rows = rows[mask]
+    cols = cols[mask]
+    values = G_values[mask]
+    
+    G_exp = sp.coo_matrix((values, (rows, cols)), shape=(9*r, 9*t)).tocsr()
+    return G_exp
 
 def visualize_groups(V, T, G):
     n_clusters = G.shape[0]
@@ -51,8 +89,14 @@ def visualize_groups(V, T, G):
     tetmesh = TetMesh([V, T])
     tetmesh.cellcolors = colors[dominant_clusters]
     
+    camera_settings = dict(
+        pos=(10, 0, 0),           # Camera position
+        focalPoint=(0, 0, 0),    # Look-at target
+        viewup=(0, 0, 1)         # "Up" direction
+    )
+    
     plotter = Plotter(title=f"Tetrahedron Groups (n_clusters={n_clusters})")
-    plotter = show(tetmesh, interactive=True)
+    plotter = show(tetmesh, interactive=True, camera=camera_settings)
     
     return plotter
 
@@ -84,7 +128,7 @@ if __name__ == "__main__":
     _, EMs = create_eigenmode_weights(K, M, Jw, n=20)
     
     # Create and visualize groups
-    G = create_group_matrix(_, EMs, T, vol, n_clusters=40)
+    G = create_group_matrix(_, EMs, T, vol, n_clusters=500)
     # visualize_eigenmodes(V, EMs.T)
     visualize_groups(V, T, G)
 

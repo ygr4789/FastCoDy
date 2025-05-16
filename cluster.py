@@ -25,6 +25,8 @@ def create_cody_animation(json_path, original_motion=False):
     mu = 3e-5 # lin mic
     # mu = 3e-6 # poi mic
     # mu = 3e-6 # poi elephant
+    # mu = 1e-5 # poi elephant clustered
+    # mu = 1e-3 # sphere
 
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = lambda_
@@ -68,15 +70,20 @@ def create_cody_animation(json_path, original_motion=False):
         Jw = W.T @ lumped_mass_3n_to_n(phi)
         
         # _, EMW = create_eigenmode_weights(K, M, Jw.todense(), n=20)
-        # _, EMW = create_eigenmode_weights(K, M, Jw, n=20)
-        _, EMW = create_eigenmode_weights(K, M, n=50)
+        _, EMW = create_eigenmode_weights(K, M, Jw, n=20)
+        # _, EMW = create_eigenmode_weights(K, M, n=20)
         B = lbs_matrix_column(V, EMW)
+        
+        G = create_group_matrix(_, EMW, T, vol, n_clusters=20)
+        
+        G_exp = create_exploded_group_matrix(G)
         
         Beq = np.zeros(Jleak.T.shape[0])
     # ---------------------------------------------------
     
     start = time.time()
-    solver = arap_solver(V, T, J, B, Jleak.T, params[:, 1], dt*dt)
+    
+    solver = arap_solver(V, T, J, B, G_exp, Jleak.T, params[:, 1], dt*dt)
     z = np.zeros(B.shape[1])
     p = TF.T.flatten()
     st = sim_state(z, p)
@@ -129,7 +136,7 @@ def render_animation(Vn_list, V0n_list, F):
     plt.set_frame(0)
     # plt.show()
     plt.show(camera=camera_settings)
-    plt.close()
+    # plt.close()
 
 if __name__ == "__main__":
     import argparse

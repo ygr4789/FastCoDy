@@ -6,3 +6,4 @@ from .create_mask_matrix import create_mask_matrix
 from .eigenmode import create_eigenmode_weights
 from .line_search import line_search
 from .weight_space_constraint import weight_space_constraint
+from .cluster_group import create_group_matrix, create_exploded_group_matrix
