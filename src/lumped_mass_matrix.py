@@ -37,32 +37,3 @@ def lumped_mass_matrix(V, T):
 
     M = sp.coo_matrix((data, (rows, cols)), shape=(3 * N, 3 * N)).tocsr()
     return M
-
-# def lumped_mass_matrix(V, T):
-#     """
-#     Create a 3N x 3N block diagonal mass matrix from an N x 3 vertex matrix and a Tetrahedral mesh.
-    
-#     Args:
-#         V: (N, 3) numpy array of vertex positions.
-#         T: (M, 4) numpy array of tetrahedron indices.
-    
-#     Returns:
-#         M: scipy.sparse.csr_matrix of shape (3N, 3N)
-#     """
-#     # Step 1: Compute lumped mass matrix (N x N)
-#     Ms = igl.massmatrix(V, T, igl.MASSMATRIX_TYPE_FULL)  # returns scipy sparse
-
-#     # Step 2: Create block-diagonal (3N x 3N)
-#     row, col, data = [], [], []
-
-#     Ms = Ms.tocoo()
-#     for i, j, v in zip(Ms.row, Ms.col, Ms.data):
-#         for d in range(3):
-#             idx = 3 * i + d
-#             jdx = 3 * j + d
-#             row.append(idx)
-#             col.append(jdx)
-#             data.append(v)
-
-#     M = sp.coo_matrix((data, (row, col)), shape=(3 * V.shape[0], 3 * V.shape[0]))
-#     return M.tocsr()

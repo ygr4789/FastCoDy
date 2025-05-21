@@ -3,6 +3,7 @@ import numpy as np
 import igl
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
+import torch
 
 from scipy.sparse.linalg import minres
 from sksparse.cholmod import cholesky
@@ -22,8 +23,8 @@ def create_cody_animation(json_path, original_motion=False):
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
     # lambda_, mu = emu_to_lame(YM, pr)
     lambda_ = 1
-    # mu = 3e-5 # lin mic cluster 50 50
-    mu = 1e-6 # poi elephant cluster 50 50
+    mu = 5e-5 # lin mic cluster 50 50
+    # mu = 1e-5 # poi ele cluster 50 50
 
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = lambda_
@@ -57,44 +58,43 @@ def create_cody_animation(json_path, original_motion=False):
         # e = linear_tetmesh_arap_q(V, T, VCol, dX, vol, params)
         
         # === Poisson Constraint Mask ===
-        # phi = create_mask_matrix(V, T, C, BE, 'lin')
-        phi = create_mask_matrix(V, T, C, BE)
+        phi, leak = create_mask_matrix(V, T, C, BE, 'lin')
+        # phi, leak = create_mask_matrix(V, T, C, BE)
 
         # === Constraint system ===
         J = lbs_matrix_column(V, W)
-        Jleak = M @ phi @ J
-        # Jw = weight_space_constraint(Jleak, V)
-        Jw = W.T @ lumped_mass_3n_to_n(phi)
+        # Jleak = M @ phi @ J
+        Jw = W.T @ phi
         
-        # _, EMW = create_eigenmode_weights(K, M, Jw.todense(), n=20)
         _, EMW = create_eigenmode_weights(K, M, Jw, n=50)
         B = lbs_matrix_column(V, EMW / _ ** 0.5)
+        B = leak @ B
+        
         G = create_group_matrix(_, EMW, T, vol, n_clusters=50)
         G_exp = create_exploded_group_matrix(G)
-        Beq = np.zeros(Jleak.T.shape[0])
     # ---------------------------------------------------
     
     start = time.time()
     
-    solver = arap_solver(V, T, J, B, G_exp, Jleak.T, params[:, 1], dt*dt)
-    z = np.zeros(B.shape[1])
-    p = TF.T.flatten()
+    solver = arap_solver(V, T, J, B, G_exp, params[:, 1], dt*dt)
+    z = torch.zeros((B.shape[1], 1), dtype=torch.float64, device=solver.device)
+    p = torch.from_numpy(TF.T.flatten()).reshape(-1, 1).to(solver.device)
     st = sim_state(z, p)
     
     for ai, TF in enumerate(TF_list):
-        p = TF.T.flatten()
+        p = torch.from_numpy(TF.T.flatten()).reshape(-1, 1).to(solver.device)
         print(f"frame: {ai}")
-        z = solver.step(z, p, st, Beq)
+        z = solver.step(z, p, st)
         st.update(z, p)
         
         # Store result
-        V0Col = J * p
-        UCol = B * z
+        V0Col = J * p.cpu().numpy().flatten()
+        UCol = B * z.cpu().numpy().flatten()
         VCol = V0Col + UCol
         
         V0n = matrixize(V0Col)
         Vn = matrixize(VCol)
-        print(f"  Average Offset : {np.average(np.abs(z)):.2e}")
+        print(f"  Average Offset : {torch.mean(torch.abs(z)).item():.2e}")
         
         V0n_list.append(V0n)
         Vn_list.append(Vn)

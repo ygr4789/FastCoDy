@@ -1,30 +1,35 @@
 import igl
 import numpy as np
 import scipy.sparse as sp
+import torch
 
 from src import lumped_mass_matrix
 
 class arap_precomp_static:
-  def __init__(self, X, T, J, B, G, Aeq, mu, invh2):
+  def __init__(self, X, T, J, B, G, mu, invh2, device='cuda'):
+    self.device = device
     M = lumped_mass_matrix(X, T)
     K, V, Mu = self.deformation_jacobian(X, T, mu)
     C = K.T @ V @ Mu @ K
     A = B.T @ M @ B * invh2 + B.T @ C @ B
     
-    AeqB = Aeq @ B
-    A = sp.vstack([
-      sp.hstack([A, AeqB.T]),
-      sp.hstack([AeqB, sp.csr_matrix((AeqB.shape[0], AeqB.shape[0]))])
-    ]).tocsr()
-    
-    self.A = A
-    self.GKJ = G @ K @ J
-    self.GKB = G @ K @ B
-    self.GVKB = G @ V @ Mu @ K @ B
-    self.BtCJ = B.T @ C @ J
-    
-    self.BtMJ = B.T @ M @ J
-    self.BtMB = B.T @ M @ B
+    A = self._to_tensor(A)
+    self.A_inv = self._to_tensor(torch.linalg.inv(A))
+    self.GKJ = self._to_tensor(G @ K @ J)
+    self.GKB = self._to_tensor(G @ K @ B)
+    self.GVKB = self._to_tensor(G @ V @ Mu @ K @ B)
+    self.BtCJ = self._to_tensor(B.T @ C @ J)
+    self.BtMJ = self._to_tensor(B.T @ M @ J)
+    self.BtMB = self._to_tensor(B.T @ M @ B)
+
+  def _to_tensor(self, x):
+    if isinstance(x, torch.Tensor):
+      return x.to(self.device)
+    elif sp.issparse(x):
+      # Convert sparse matrix to dense tensor
+      return torch.from_numpy(x.toarray()).to(self.device)
+    else:
+      return torch.from_numpy(x).to(self.device)
     
   def deformation_jacobian(self, X, T, mu):
     t = T.shape[0]

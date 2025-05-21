@@ -18,28 +18,21 @@ def create_mask_matrix(V, T, C=None, BE=None, mask_type="poisson"):
     else:
         Z = poisson_weights(V, T, M)
     
-    ZZ = np.zeros(3 * Z.shape[0])
+    phi = sp.diags(Z, shape=(V.shape[0], V.shape[0]), format='csr')
+    leak = 1 - Z / np.max(Z)
+    leak = sp.diags(np.repeat(leak, 3))
     
-    for i in range(Z.shape[0]):
-        ZZ[3 * i + 0] = Z[i]
-        ZZ[3 * i + 1] = Z[i]
-        ZZ[3 * i + 2] = Z[i]
-
-    phi = sp.diags(ZZ, offsets=0, shape=(3 * V.shape[0], 3 * V.shape[0]), format='csr')
-    return phi
+    return phi, leak
     
 def linear_weights(V, T, M):
     Z = np.zeros(V.shape[0])
     for i in range(V.shape[0]):
         top = 0.5
         bot = -0.5
-        # bot = 0.0
         if V[i][2] > top: Z[i] = 0.0
         elif V[i][2] < bot: Z[i] = 1.0
-        else: Z[i] = 0.0
-        # else: Z[i] = (top - V[i][2]) / (top - bot)
+        else: Z[i] = (top - V[i][2]) / (top - bot)
     return M * Z
-    # return Z
     
 def rig_ortho_weights(V, T, C, BE):
     pass
@@ -68,15 +61,15 @@ if __name__ == "__main__":
     mask_type = args.type
 
     V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
-    phi = create_mask_matrix(V, T, mask_type=mask_type)
-    phi_diag = phi.diagonal() 
-    Z = phi_diag[::3]
+    phi, leak = create_mask_matrix(V, T, mask_type=mask_type)
+    leak_diag = leak.diagonal() 
+    Z = leak_diag[::3]
     
     from vedo import Mesh, Plotter, Points
     
-    pc = Points(V, r=8)
+    pc = Points(V, r=5)
     pc.pointdata["scalars"] = Z
-    pc.cmap("viridis").add_scalarbar(title="weight")
+    pc.cmap("summer").add_scalarbar(title="weight")
 
     camera_settings = dict(
         pos=(10, 0, 0),           # Camera position

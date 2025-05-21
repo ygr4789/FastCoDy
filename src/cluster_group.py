@@ -88,8 +88,8 @@ def visualize_groups(V, T, G):
     )
     
     plotter = Plotter(title=f"Tetrahedron Groups (n_clusters={n_clusters})")
-    # plotter = show(tetmesh, interactive=True, camera=camera_settings)
-    plotter = show(tetmesh, interactive=True)
+    plotter = show(tetmesh, interactive=True, camera=camera_settings)
+    # plotter = show(tetmesh, interactive=True)
     
     return plotter
 
@@ -119,8 +119,8 @@ def visualize_groups_pc(V, T, G):
         
         max_weight = weights.max()
         pc.cmap("YlOrRd", vmin=0, vmax=1).add_scalarbar(title=f"cluster {i}")
-        # plotter.show(pc, at=i, interactive=False, camera=camera_settings)
-        plotter.show(pc, at=i, interactive=False)
+        plotter.show(pc, at=i, interactive=False, camera=camera_settings)
+        # plotter.show(pc, at=i, interactive=False)
     
     plotter.interactive().close()
     return plotter
@@ -145,16 +145,14 @@ if __name__ == "__main__":
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
     J = lbs_matrix_column(V, W)
-    phi = create_mask_matrix(V, T, C, BE, 'lin')
+    phi, leak = create_mask_matrix(V, T, C, BE, 'lin')
+    Jw = W.T @ phi
     
-    Jleak = M @ phi @ J
-    Jw = W.T @ lumped_mass_3n_to_n(phi)
+    _, EMW = create_eigenmode_weights(K, M, Jw, n=50)
+    B = lbs_matrix_column(V, EMW / _ ** 0.5)
+    B = leak @ B
     
-    _, EMs = create_eigenmode_weights(K, M, Jw, n=50)
-    
-    # Create and visualize groups
-    G = create_group_matrix(_, EMs, T, vol, n_clusters=20)
-    # visualize_eigenmodes(V, EMs.T)
+    G = create_group_matrix(_, EMW, T, vol, n_clusters=20)
     # visualize_groups(V, T, G)
     visualize_groups_pc(V, T, G)
 
