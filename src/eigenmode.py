@@ -80,11 +80,12 @@ if __name__ == "__main__":
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
     J = lbs_matrix_column(V, W)
-    phi = create_mask_matrix(V, T, C, BE, 'lin')
+    phi = create_mask_matrix(V, T, C, BE)
     
     Jleak = M @ phi @ J
     Jw = W.T @ lumped_mass_3n_to_n(phi)
     
-    _, EMs = create_eigenmode_weights(K, M, Jw, n=20)
+    EVs, EMs = create_eigenmode_weights(K, M, Jw, n=50)
+    EMs = EMs / (EVs ** 0.5)
     visualize_eigenmodes(V, EMs.T)
 

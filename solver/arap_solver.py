@@ -38,7 +38,6 @@ class arap_solver:
     
   def local_step(self, z):
     f = self.sp.GKB @ z + self.dp.GKJp  # shape: (9t,)
-    # must be GKUr, not GKJp??
     nt = f.shape[0] // 9 # number of tets
 
     F_stack = f.reshape(nt * 3, 3) # shape: (3 * t, 3)
