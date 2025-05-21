@@ -1,8 +1,10 @@
 import numpy as np
 import igl
+
+from scipy.linalg import null_space
 from scipy.sparse.linalg import eigsh
 
-from vedo import Points, Plotter
+from vedo import Points, Plotter, TetMesh, show
 # from vedo.applications import AnimationPlayer
 
 if __name__ == "__main__":
@@ -12,48 +14,28 @@ if __name__ == "__main__":
 from src import *
 from sim import *
 
-def reorder_hessian_xyz_to_xxyyzz(H):
-    n_vertices = H.shape[0] // 3
-
-    # Build permutation indices
-    idx = np.arange(3 * n_vertices)
-    new_idx = np.concatenate([
-        idx[0::3],  # x0, x1, x2, ...
-        idx[1::3],  # y0, y1, y2, ...
-        idx[2::3]   # z0, z1, z2, ...
-    ])
-
-    # Apply permutation to both rows and columns
-    H_reordered = H[np.ix_(new_idx, new_idx)]
-    return H_reordered
-
-def sum_diagonal_blocks(H_reordered):
-    n_vertices = H_reordered.shape[0] // 3
-    # Extract blocks
-    H_xx = H_reordered[0*n_vertices : 1*n_vertices, 0*n_vertices : 1*n_vertices]
-    H_yy = H_reordered[1*n_vertices : 2*n_vertices, 1*n_vertices : 2*n_vertices]
-    H_zz = H_reordered[2*n_vertices : 3*n_vertices, 2*n_vertices : 3*n_vertices]
+def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
+    if J is None:
+        return eigsh(H, k=n, M=M, which='SM')
     
-    # Sum the diagonal blocks
-    H_sum = H_xx + H_yy + H_zz
-    return H_sum
+    # null_J = null_space(J.todense())
+    null_J = null_space(J)
 
-def lumped_mass_3n_to_n_x_only(M_3n):
-    n_vertices = M_3n.shape[0] // 3
-    lumped_masses = np.zeros(n_vertices)
-    for i in range(n_vertices):
-        lumped_masses[i] = M_3n[3*i, 3*i]
-    M_n = np.diag(lumped_masses)
-    return M_n
+    # Project H and M into the null space
+    H_proj = null_J.T @ H @ null_J
+    M_proj = null_J.T @ M @ null_J
 
-def create_eigenmode_weights(K, M, n=10):
-    M = lumped_mass_3n_to_n_x_only(M)
-    invM = np.linalg.inv(M)
-    invM = np.sqrt(invM)
+    # Solve generalized eigenproblem in reduced space
+    eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, which='SM')
 
-    KW = sum_diagonal_blocks(reorder_hessian_xyz_to_xxyyzz(K))
-    eigvals, eigvecs = eigsh(invM * KW, k=n, which='SM')
-    return eigvecs
+    # Recover full-space eigenvectors
+    eigvecs = null_J @ eigvecs
+    return eigvals, eigvecs
+
+def create_eigenmode_weights(K, M, J=None, n=10):
+    M = lumped_mass_3n_to_n(M)
+    KW = sum_diagonal_blocks(reorder_xyzxyz_to_xxyyzz(K))
+    return solve_generalized_eig(KW, M, J, n)
 
 def visualize_eigenmodes(V, EMs):
     num_modes = EMs.shape[0]
@@ -69,14 +51,18 @@ def visualize_eigenmodes(V, EMs):
     )
     for i in range(num_modes):
         pc = Points(V, c='green', r=4)
-        pc.pointdata["scalars"] = EMs[i]
-        pc.cmap("viridis", vmin=-0.1, vmax=0.1).add_scalarbar(title="weight")
+        scalars = EMs[i]
+        pc.pointdata["scalars"] = scalars
+        
+        max_mag = max(abs(scalars.min()), abs(scalars.max()))
+        pc.cmap("coolwarm", vmin=-max_mag, vmax=max_mag).add_scalarbar(title="weight")
         plotter.show(pc, at=i, interactive=False, camera=camera_settings)
+        # plotter.show(pc, at=i, interactive=False)
     plotter.interactive().close()
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='generate complementary dynamics secondary motion')
+    parser = argparse.ArgumentParser(description='generate eigenmodes')
     parser.add_argument('--input', '-i', type=str, required=True, default='examples/sphere/sphere.json', help='json input path')
     
     args = parser.parse_args()
@@ -93,6 +79,13 @@ if __name__ == "__main__":
     VCol = vectorize(V)
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
+    J = lbs_matrix_column(V, W)
+    phi = create_mask_matrix(V, T, C, BE)
     
-    EMs = create_eigenmode_weights(K, M, 12).T
-    visualize_eigenmodes(V, EMs)
+    Jleak = M @ phi @ J
+    Jw = W.T @ lumped_mass_3n_to_n(phi)
+    
+    EVs, EMs = create_eigenmode_weights(K, M, Jw, n=50)
+    EMs = EMs / (EVs ** 0.5)
+    visualize_eigenmodes(V, EMs.T)
+

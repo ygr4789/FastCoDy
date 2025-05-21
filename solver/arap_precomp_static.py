@@ -5,45 +5,32 @@ import scipy.sparse as sp
 from src import lumped_mass_matrix
 
 class arap_precomp_static:
-  def __init__(self, X, T, J, Aeq, mu, invh2):
+  def __init__(self, X, T, J, B, G, Aeq, mu, invh2):
     M = lumped_mass_matrix(X, T)
-    K, V, Mu= self.deformation_jacobian(X, T, mu)
+    K, V, Mu = self.deformation_jacobian(X, T, mu)
     C = K.T @ V @ Mu @ K
+    A = B.T @ M @ B * invh2 + B.T @ C @ B
     
-    x = X.flatten()
-    A = invh2 * M + C
-    # A = invh2 * M
-    
+    AeqB = Aeq @ B
     A = sp.vstack([
-      sp.hstack([A, Aeq.T]),
-      sp.hstack([Aeq, sp.csr_matrix((Aeq.shape[0], Aeq.shape[0]))])
+      sp.hstack([A, AeqB.T]),
+      sp.hstack([AeqB, sp.csr_matrix((AeqB.shape[0], AeqB.shape[0]))])
     ]).tocsr()
     
-    self.J = J
-    
-    self.x = x
-    self.M = M
     self.A = A
-    self.K = K
-    self.VK = V @ Mu @ K
+    self.GKJ = G @ K @ J
+    self.GKB = G @ K @ B
+    self.GVKB = G @ V @ Mu @ K @ B
+    self.BtCJ = B.T @ C @ J
     
-    self.Kx = K @ x
-    self.Cx = C @ x
-    self.Mx = M @ x
-    self.VKx = V @ Mu @ K @ x
-    
-    self.CJ = C @ J
-    self.KJ = K @ J
-    self.MJ = M @ J
-    self.VKJ = V @ Mu @ K @ J
+    self.BtMJ = B.T @ M @ J
+    self.BtMB = B.T @ M @ B
     
   def deformation_jacobian(self, X, T, mu):
     t = T.shape[0]
     n = X.shape[0]
     
-    print(t)
     V = igl.volume(X, T)
-    print(V.shape)
     
     K_data = []
     K_rows = []

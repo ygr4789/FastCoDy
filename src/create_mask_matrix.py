@@ -33,6 +33,7 @@ def linear_weights(V, T, M):
     for i in range(V.shape[0]):
         top = 0.5
         bot = -0.5
+        # bot = 0.0
         if V[i][2] > top: Z[i] = 0.0
         elif V[i][2] < bot: Z[i] = 1.0
         else: Z[i] = 0.0
@@ -50,7 +51,7 @@ def poisson_weights(V, T, M):
     bc = np.zeros((len(b), 1))
 
     Q = -L
-    l = -M * 10000
+    l = -M
     Aeq = sp.csc_matrix((0, Q.shape[0]))
     Beq = np.array([])  
 
