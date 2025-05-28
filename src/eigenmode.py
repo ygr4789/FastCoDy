@@ -1,6 +1,7 @@
 import numpy as np
 import igl
 
+import scipy.sparse as sp
 from scipy.linalg import null_space
 from scipy.sparse.linalg import eigsh
 
@@ -26,7 +27,7 @@ def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
     M_proj = null_J.T @ M @ null_J
 
     # Solve generalized eigenproblem in reduced space
-    eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, which='SM')
+    eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, sigma=0.0)
 
     # Recover full-space eigenvectors
     eigvecs = null_J @ eigvecs
@@ -56,8 +57,8 @@ def visualize_eigenmodes(V, EMs):
         
         max_mag = max(abs(scalars.min()), abs(scalars.max()))
         pc.cmap("coolwarm", vmin=-max_mag, vmax=max_mag).add_scalarbar(title="weight")
-        plotter.show(pc, at=i, interactive=False, camera=camera_settings)
-        # plotter.show(pc, at=i, interactive=False)
+        # plotter.show(pc, at=i, interactive=False, camera=camera_settings)
+        plotter.show(pc, at=i, interactive=False)
     plotter.interactive().close()
 
 if __name__ == "__main__":
@@ -77,15 +78,22 @@ if __name__ == "__main__":
     dX = linear_tetmesh_dphi_dX(V, T)
     vol = igl.volume(V, T)
     VCol = vectorize(V)
+    
+    print("calculating arap")
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
+    print("calculating mass")
     M = lumped_mass_matrix(V, T)
+    print("calculating lbs")
     J = lbs_matrix_column(V, W)
-    phi = create_mask_matrix(V, T, C, BE)
     
-    Jleak = M @ phi @ J
-    Jw = W.T @ lumped_mass_3n_to_n(phi)
+    print("calculating mask")
+    phi, leak = create_mask_matrix(V, T, C, BE)
+    Jw = W.T @ phi
     
+    print("calculating eigenmodes")
     EVs, EMs = create_eigenmode_weights(K, M, Jw, n=50)
     EMs = EMs / (EVs ** 0.5)
+    
+    print("visualizing eigenmodes")
     visualize_eigenmodes(V, EMs.T)
 

@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as sp
 
 def emu_to_lame(E, p):
     lambda_ = (E * p) / ((1 + p) * (1 - 2 * p))
@@ -42,5 +43,5 @@ def lumped_mass_3n_to_n(M_3n):
     lumped_masses = np.zeros(n_vertices)
     for i in range(n_vertices):
         lumped_masses[i] = M_3n[3*i, 3*i]
-    M_n = np.diag(lumped_masses)
+    M_n = sp.diags(lumped_masses)
     return M_n
