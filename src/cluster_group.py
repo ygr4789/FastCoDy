@@ -30,23 +30,15 @@ def create_group_matrix(eigvals, eigvecs, T, Vol, n_clusters=100):
     for i in range(n_tets):
         tet_vertices = T[i]
         EVdW2_tet[i] = np.mean(EVdW2[tet_vertices], axis=0)
-        
-    # Initialize fuzzy c-means parameters
-    cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
-        EVdW2_tet.T, 
-        n_clusters,
-        1.1, # fuzzy exponent
-        error=0.005,
-        maxiter=1000,
-        init=None,
-        seed=42
-    )
     
-    G = u # (n_clusters, n_tets) shape
+    # Use KMeans for hard clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    labels = kmeans.fit_predict(EVdW2_tet)
     
-    # Normalize each column to sum to 1 - already done in cmeans
-    # G = G / np.sum(G, axis=0, keepdims=True)
-    
+    # Convert labels to one-hot encoding matrix G
+    G = np.zeros((n_clusters, n_tets))
+    G[labels, np.arange(n_tets)] = 1
+
     return G
 
 def create_exploded_group_matrix(G):

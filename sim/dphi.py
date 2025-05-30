@@ -1,6 +1,4 @@
 import numpy as np
-from scipy.linalg import svd
-import scipy.sparse as sp
 
 def eval_at_point(V, T, func, tmp_shape, X=None):
     """

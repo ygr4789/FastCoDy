@@ -36,7 +36,6 @@ def prepare_cody_simulation(json_path):
     # === Boundary faces and LBS Matrix ===
     F = igl.boundary_facets(T)
     F = F[:, ::-1]  # reverse each face row to match
-    VM = igl.lbs_matrix(V, W)
 
     # === Volume and differential operator ===
     vol = igl.volume(V, T)
@@ -47,9 +46,6 @@ def prepare_cody_simulation(json_path):
 
     # === Initial Transformation ===
     TF = TF_list[0]
-    Vr = VM @ TF
-    U = Vr - V
-
     VCol = vectorize(V)
     
     print(f"precomputing matrices...")
@@ -63,7 +59,7 @@ def prepare_cody_simulation(json_path):
     Jw = W.T @ phi
     
     _, EMW = create_eigenmode_weights(K, M, Jw, n=50)
-    B = lbs_matrix_column(V, EMW / _ ** 0.5)
+    B = lbs_matrix_column(V, EMW)
     B = leak @ B
     
     G = create_group_matrix(_, EMW, T, vol, n_clusters=50)

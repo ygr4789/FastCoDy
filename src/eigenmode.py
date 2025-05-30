@@ -17,7 +17,7 @@ from sim import *
 
 def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
     if J is None:
-        return eigsh(H, k=n, M=M, which='SM')
+        return eigsh(H, k=n, M=M, sigma=0.0)
     
     # null_J = null_space(J.todense())
     null_J = null_space(J)
