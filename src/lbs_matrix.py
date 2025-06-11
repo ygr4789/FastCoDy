@@ -1,7 +1,6 @@
 import scipy.sparse
 import igl
 import numpy as np
-from scipy.sparse import coo_matrix
 
 def lbs_matrix_column(V, W):
     VW = igl.lbs_matrix(V, W)

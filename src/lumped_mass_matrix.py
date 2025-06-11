@@ -9,9 +9,13 @@ def compute_vertex_voronoi_volumes(V, T):
     vol = np.zeros(V.shape[0])
     a, b, c, d = V[T[:, 0]], V[T[:, 1]], V[T[:, 2]], V[T[:, 3]]
     tet_volumes = compute_tet_volume(a, b, c, d)
-
+    
+    # Check for negative volumes
+    if np.any(tet_volumes <= 0):
+        raise ValueError("Negative or zero volume tetrahedra detected")
+    
     for i in range(4):
-        np.add.at(vol, T[:, i], tet_volumes / 4.0)
+        vol[T[:, i]] += tet_volumes / 4.0
 
     return vol
 

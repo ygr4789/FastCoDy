@@ -5,7 +5,7 @@ import torch.linalg as linalg
 from solver import arap_precomp_dynamic, arap_precomp_static
 
 class arap_solver:
-  def __init__(self, X, T, J, B, G, mu, invh2, max_iter = 30, threshold = 1e-8, device='cuda'):
+  def __init__(self, X, T, J, B, G, mu, invh2, max_iter = 100, threshold = 1e-8, device='cuda'):
     self.device = device
     self.sp = arap_precomp_static(X, T, J, B, G, mu, invh2, device=device)
     self.dp = arap_precomp_dynamic(self.sp)

@@ -1,12 +1,9 @@
 import numpy as np
 import igl
 
-import scipy.sparse as sp
-from scipy.linalg import null_space
 from scipy.sparse.linalg import eigsh
-
-from vedo import Points, Plotter, TetMesh, show
-# from vedo.applications import AnimationPlayer
+import scipy.sparse
+from vedo import Points, Plotter
 
 if __name__ == "__main__":
     import sys, os
@@ -15,28 +12,34 @@ if __name__ == "__main__":
 from src import *
 from sim import *
 
-def solve_generalized_eig(H, M, J, n=10, tol=1e-12):
-    if J is None:
-        return eigsh(H, k=n, M=M, sigma=0.0)
-    
-    # null_J = null_space(J.todense())
-    null_J = null_space(J)
-
-    # Project H and M into the null space
-    H_proj = null_J.T @ H @ null_J
-    M_proj = null_J.T @ M @ null_J
-
-    # Solve generalized eigenproblem in reduced space
-    eigvals, eigvecs = eigsh(H_proj, k=n, M=M_proj, sigma=0.0)
-
-    # Recover full-space eigenvectors
-    eigvecs = null_J @ eigvecs
-    return eigvals, eigvecs
-
-def create_eigenmode_weights(K, M, J=None, n=10):
+def create_eigenmode_weights(K, M, L, leak=None, n=10):
     M = lumped_mass_3n_to_n(M)
     KW = sum_diagonal_blocks(reorder_xyzxyz_to_xxyyzz(K))
-    return solve_generalized_eig(KW, M, J, n)
+    
+    if leak is not None:
+        mult = 1 / (1e-8 + leak)
+        KW = KW.multiply(mult)
+        
+    EVs, EMs = eigsh(KW, k=n, M=M, sigma=0.0)
+    EMs = explicit_smooth(EMs, L)
+    
+    if leak is not None:
+        EMs = EMs * leak[:, np.newaxis]
+    
+    return EVs, EMs
+
+def explicit_smooth(f, L, steps=100):
+    L = (L + L.T) / 2
+    L.setdiag(0)
+    row_sums = np.array(L.sum(axis=1)).flatten()
+    nonzero_rows = row_sums != 0
+    scale = sp.diags(0.499/row_sums[nonzero_rows], 0)
+    L = scale @ L
+    L.setdiag(0.499)
+    
+    for _ in range(steps):
+        f = L @ f
+    return f
 
 def visualize_eigenmodes(V, EMs):
     num_modes = EMs.shape[0]
@@ -45,11 +48,6 @@ def visualize_eigenmodes(V, EMs):
 
     plotter = Plotter(shape=(rows, cols), title="Eigenmodes")
 
-    camera_settings = dict(
-        pos=(10, 0, 0),
-        focalPoint=(0, 0, 0),
-        viewup=(0, 0, 1)
-    )
     for i in range(num_modes):
         pc = Points(V, c='green', r=4)
         scalars = EMs[i]
@@ -57,20 +55,22 @@ def visualize_eigenmodes(V, EMs):
         
         max_mag = max(abs(scalars.min()), abs(scalars.max()))
         pc.cmap("coolwarm", vmin=-max_mag, vmax=max_mag).add_scalarbar(title="weight")
-        # plotter.show(pc, at=i, interactive=False, camera=camera_settings)
         plotter.show(pc, at=i, interactive=False)
     plotter.interactive().close()
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='generate eigenmodes')
-    parser.add_argument('--input', '-i', type=str, required=True, default='examples/sphere/sphere.json', help='json input path')
+    parser.add_argument('--input', '-i', type=str, default='data/wrs/wrs_out/wrs.gltf', help='json input path')
+    parser.add_argument('--n_modes', '-n', type=int, default=50, help='number of modes')
     
     args = parser.parse_args()
-    json_path = args.input
+    gltf_path = args.input
     
-    V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
-    lambda_, mu = emu_to_lame(YM, pr)
+    V0, F0, V, T, F, TF_list, C, BE, W, dt = read_gltf_data(gltf_path)
+    
+    lambda_ = 1
+    mu = 1e-5
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = 0.5 * lambda_
     params[:, 1] = mu
@@ -87,12 +87,11 @@ if __name__ == "__main__":
     J = lbs_matrix_column(V, W)
     
     print("calculating mask")
-    phi, leak = create_mask_matrix(V, T, C, BE)
-    Jw = W.T @ phi
+    leak = create_mask_matrix(V, T, F, C, BE, mask_type="rig")
     
     print("calculating eigenmodes")
-    EVs, EMs = create_eigenmode_weights(K, M, Jw, n=50)
-    EMs = EMs / (EVs ** 0.5)
+    L = igl.cotmatrix(V, T)
+    EVs, EMs = create_eigenmode_weights(K, M, L, leak, n=10)
     
     print("visualizing eigenmodes")
     visualize_eigenmodes(V, EMs.T)

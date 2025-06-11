@@ -2,11 +2,9 @@ import numpy as np
 import igl
 
 from vedo import Plotter, TetMesh, Points, show
-# from vedo.applications import AnimationPlayer
 
 import scipy.sparse as sp
 import matplotlib.pyplot as plt
-import skfuzzy as fuzz
 from sklearn.cluster import KMeans
 
 if __name__ == "__main__":
@@ -19,6 +17,10 @@ from sim import *
 def create_group_matrix(eigvals, eigvecs, T, Vol, n_clusters=100):
     EW = eigvals
     EV = eigvecs
+    
+    EW = EW[1:]
+    EV = EV[:,1:]
+    
     EW2 = EW ** 0.5
     EVdW2 = EV / EW2
     # EVdW2 = EV
@@ -120,13 +122,15 @@ def visualize_groups_pc(V, T, G):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='generate cluster groups')
-    parser.add_argument('--input', '-i', type=str, required=True, default='examples/sphere/sphere.json', help='json input path')
+    parser.add_argument('--input', '-i', type=str, default='data/wrs/wrs_out/wrs.gltf', help='json input path')
+    parser.add_argument('--n_clusters', '-n', type=int, default=50, help='number of clusters')
     
     args = parser.parse_args()
     json_path = args.input
     
-    V, T, F, C, PI, BE, W, TF_list, dt, YM, pr, scale, physic_model = read_json_data(json_path)
-    lambda_, mu = emu_to_lame(YM, pr)
+    V, T, F, TF_list, C, BE, W, dt = read_gltf_data(json_path)
+    lambda_ = 1
+    mu = 1e-5
     params = np.zeros((T.shape[0], 2))
     params[:, 0] = 0.5 * lambda_
     params[:, 1] = mu
@@ -137,14 +141,9 @@ if __name__ == "__main__":
     K = linear_tetmesh_arap_dq2(V, T, VCol, dX, vol, params)
     M = lumped_mass_matrix(V, T)
     J = lbs_matrix_column(V, W)
-    phi, leak = create_mask_matrix(V, T, C, BE, 'lin')
-    Jw = W.T @ phi
     
-    _, EMW = create_eigenmode_weights(K, M, Jw, n=50)
-    B = lbs_matrix_column(V, EMW / _ ** 0.5)
-    B = leak @ B
+    _, EMW = create_eigenmode_weights(K, M, n=50)
     
-    G = create_group_matrix(_, EMW, T, vol, n_clusters=20)
-    # visualize_groups(V, T, G)
+    G = create_group_matrix(_, EMW, T, vol, n_clusters=args.n_clusters)
     visualize_groups_pc(V, T, G)
 

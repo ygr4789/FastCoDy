@@ -275,4 +275,5 @@ def linear_tetmesh_arap_dq2(V, E, q, dphidX, volume, params):
 
     values = H_all.reshape(-1)
     H_sparse = sp.coo_matrix((values, (row_indices, col_indices)), shape=(3 * N, 3 * N)).tocsr()
+    H_sparse = (H_sparse + H_sparse.T) / 2
     return H_sparse

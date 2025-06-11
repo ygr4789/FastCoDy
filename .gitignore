@@ -2,5 +2,6 @@
 __pycache__
 build
 test
+data
 result
 blender
